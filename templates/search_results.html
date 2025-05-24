@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Results</title>
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="header">
+        <h1>Search Results</h1>
+        <div>
+            <a href="/">Search</a>
+            <a href="/upload_image">Upload Image</a>
+            <a href="/history">History</a>
+        </div>
+    </div>
+    <div class="container">
+        <div id="status" class="status">Инициализация поиска...</div>
+
+        <!-- Общая информация -->
+        <div id="aggregated-info" class="profile-card">
+            <h2>Общая информация</h2>
+            <p><strong>ФИО:</strong> <span id="full-name">Загрузка...</span></p>
+            <p><strong>Адрес:</strong> <span id="address">Загрузка...</span></p>
+            <p><strong>Номер телефона:</strong> <span id="phone">Загрузка...</span></p>
+            <p><strong>Дата рождения:</strong> <span id="birth-date">Загрузка...</span></p>
+            <p><strong>IP:</strong> <span id="ip">Загрузка...</span></p>
+        </div>
+
+        <!-- Детали по платформам -->
+        <div id="platform-details"></div>
+    </div>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

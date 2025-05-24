@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Result</title>
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="header">
+        <h1>Image Result</h1>
+        <a href="/">Search</a>
+        <a href="/upload_image">Upload Image</a>
+        <a href="/history">History</a>
+    </div>
+    <div class="container">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="alert">
+                    {% for message in messages %}
+                        {{ message }}<br>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        <div class="result-layout">
+            <!-- Верхний ряд: Картинка слева, карта справа -->
+            <div class="result-top">
+                <div class="image-column">
+                    <h3>Image</h3>
+                    <img src="{{ url_for('static', filename=filename) }}" alt="Uploaded Image" class="result-image">
+                </div>
+                <div class="map-column">
+                    <h3>Location</h3>
+                    {{ map_html|safe }}
+                </div>
+            </div>
+            <!-- Нижний ряд: Метаданные -->
+            <div class="metadata-section">
+                <h3>EXIF Metadata</h3>
+                <button class="toggle-btn">Show</button>
+                <div class="metadata-content">
+                    {% if exif_data %}
+                        <table class="metadata-table">
+                            <thead>
+                                <tr>
+                                    <th>Key</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for key, value in exif_data.items() if key != 'SourceFile' %}
+                                    <tr>
+                                        <td>{{ key }}</td>
+                                        <td>{{ value|truncate(100, True) if value is string else value }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <p>No EXIF data available.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="text-center">
+            <a href="/history">Back to History</a>
+            <a href="/upload_image">Upload Another Image</a>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

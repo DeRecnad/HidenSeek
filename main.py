@@ -7,6 +7,7 @@ from datetime import datetime  # Для работы с датой и време
 from yarl import URL  # Для работы с URL-адресами (преобразование в строку)
 import importlib  # Для динамической загрузки модулей
 import glob  # Для поиска файлов в директории (например, модулей в search_modules)
+from config import SECRET_KEY # Импортируем секретный ключ из config.py для FLASK
 
 # Импортируем настроенный логгер из log_config.py для ведения логов
 from log_config import logger
@@ -51,7 +52,7 @@ except Exception as e:
 # Создаём приложение Flask
 app = Flask(__name__)
 # Устанавливаем секретный ключ для работы с сессиями
-app.secret_key = "supersecretkey"
+app.secret_key = SECRET_KEY
 # Указываем папку для загрузки файлов
 app.config["UPLOAD_FOLDER"] = "static/uploads"
 # Ограничиваем максимальный размер загружаемого файла (16 МБ)

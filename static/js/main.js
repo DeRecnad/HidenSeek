@@ -155,34 +155,116 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateAggregatedInfo(dataArray) {
         let aggregated = {
             fullName: 'Неизвестно',
+            birthDate: 'Загрузка...',
+            gender: 'Загрузка...',
+            age: 'Загрузка...',
             address: 'Загрузка...',
             phones: [],
-            birthDate: 'Загрузка...',
-            ip: 'Загрузка...'
+            email: 'Загрузка...',
+            ip: 'Загрузка...',
+            education: 'Загрузка...',
+            work: 'Загрузка...',
+            position: 'Загрузка...',
+            vkProfile: 'Загрузка...',
+            telegramProfile: 'Загрузка...',
+            instagramProfile: 'Загрузка...',
+            facebookProfile: 'Загрузка...',
+            interests: 'Загрузка...',
+            languages: 'Загрузка...',
+            relationship: 'Загрузка...'
         };
 
         // Обходим массив данных и агрегируем информацию
         dataArray.forEach(data => {
-            if (data.full_name && data.full_name !== 'N/A') aggregated.fullName = data.full_name;
-            if (data.first_name && data.last_name) aggregated.fullName = `${data.first_name || ''} ${data.last_name || ''}`.trim() || aggregated.fullName;
-            if (data.city) aggregated.address = data.city;
+            // Основные данные
+            if (data.full_name && data.full_name !== 'N/A' && data.full_name !== 'Неизвестно') {
+                aggregated.fullName = data.full_name;
+            }
+            if (data.first_name && data.last_name) {
+                const newFullName = `${data.first_name || ''} ${data.last_name || ''}`.trim();
+                if (newFullName && newFullName !== 'Неизвестно') {
+                    aggregated.fullName = newFullName;
+                }
+            }
+            if (data.bdate && data.bdate !== 'Загрузка...') aggregated.birthDate = data.bdate;
+            if (data.sex && data.sex !== 'Загрузка...') aggregated.gender = data.sex;
+            if (data.age && data.age !== 'Загрузка...') aggregated.age = data.age;
+
+            // Контактная информация
+            if (data.city && data.city !== 'Загрузка...') aggregated.address = data.city;
             if (data.phone) aggregated.phones.push(data.phone);
-            if (data.phones && Array.isArray(data.phones)) aggregated.phones = aggregated.phones.concat(data.phones.filter(p => p));
-            if (data.bdate) aggregated.birthDate = data.bdate;
+            if (data.phones && Array.isArray(data.phones)) {
+                aggregated.phones = [...new Set([...aggregated.phones, ...data.phones.filter(p => p)])];
+            }
+            if (data.email && data.email !== 'Загрузка...') aggregated.email = data.email;
+            if (data.ip && data.ip !== 'Загрузка...') aggregated.ip = data.ip;
+
+            // Образование и работа
+            if (data.education && data.education !== 'Загрузка...') aggregated.education = data.education;
+            if (data.career && data.career.length > 0) {
+                const latestJob = data.career[0];
+                if (latestJob.company && latestJob.company !== 'Загрузка...') aggregated.work = latestJob.company;
+                if (latestJob.position && latestJob.position !== 'Загрузка...') aggregated.position = latestJob.position;
+            }
+
+            // Социальные сети
+            if (data.platform === 'vk' && data.profile_link && data.profile_link !== 'Загрузка...') {
+                aggregated.vkProfile = data.profile_link;
+            }
+            if (data.platform === 'telegram' && data.profile_link && data.profile_link !== 'Загрузка...') {
+                aggregated.telegramProfile = data.profile_link;
+            }
+            if (data.platform === 'instagram' && data.profile_link && data.profile_link !== 'Загрузка...') {
+                aggregated.instagramProfile = data.profile_link;
+            }
+            if (data.platform === 'facebook' && data.profile_link && data.profile_link !== 'Загрузка...') {
+                aggregated.facebookProfile = data.profile_link;
+            }
+
+            // Дополнительная информация
+            if (data.interests && data.interests !== 'Загрузка...') aggregated.interests = data.interests;
+            if (data.personal_info && data.personal_info.languages && data.personal_info.languages !== 'Загрузка...') {
+                aggregated.languages = data.personal_info.languages;
+            }
+            if (data.relation && data.relation !== 'Загрузка...') aggregated.relationship = data.relation;
         });
 
         // Обновляем элементы на странице
-        const fullNameEl = document.getElementById('full-name');
-        const addressEl = document.getElementById('address');
-        const phoneEl = document.getElementById('phone');
-        const birthDateEl = document.getElementById('birth-date');
-        const ipEl = document.getElementById('ip');
+        const elements = {
+            'full-name': aggregated.fullName,
+            'birth-date': aggregated.birthDate,
+            'gender': aggregated.gender,
+            'age': aggregated.age,
+            'address': aggregated.address,
+            'phone': aggregated.phones.length > 0 ? aggregated.phones.join(', ') : 'Неизвестно',
+            'email': aggregated.email,
+            'ip': aggregated.ip,
+            'education': aggregated.education,
+            'work': aggregated.work,
+            'position': aggregated.position,
+            'vk-profile': aggregated.vkProfile,
+            'telegram-profile': aggregated.telegramProfile,
+            'instagram-profile': aggregated.instagramProfile,
+            'facebook-profile': aggregated.facebookProfile,
+            'interests': aggregated.interests,
+            'languages': aggregated.languages,
+            'relationship': aggregated.relationship
+        };
 
-        if (fullNameEl) fullNameEl.textContent = aggregated.fullName;
-        if (addressEl) addressEl.textContent = aggregated.address;
-        if (phoneEl) phoneEl.textContent = aggregated.phones.length > 0 ? aggregated.phones.join(', ') : 'Неизвестно';
-        if (birthDateEl) birthDateEl.textContent = aggregated.birthDate;
-        if (ipEl) ipEl.textContent = aggregated.ip;
+        // Обновляем все элементы
+        for (const [id, value] of Object.entries(elements)) {
+            const element = document.getElementById(id);
+            if (element) {
+                // Обновляем только если новое значение не "Загрузка..." или "Неизвестно"
+                if (value !== 'Загрузка...' && value !== 'Неизвестно') {
+                    element.textContent = value;
+                    // Если это ссылка на профиль, делаем её кликабельной
+                    if (id.endsWith('-profile')) {
+                        element.innerHTML = `<a href="${value}" target="_blank">${value}</a>`;
+                    }
+                }
+            }
+        }
     }
 
     // Функция добавления деталей платформы в результаты поиска
@@ -207,6 +289,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (data && data.length > 0) {
             // Обрабатываем каждый результат для данной платформы
             data.forEach(result => {
+                // Специальная обработка для VK
+                if (platformName === 'VK_ALT' && result.formatted_output) {
+                    details.innerHTML = `<pre class="vk-profile">${result.formatted_output}</pre>`;
+                    return;
+                }
+
                 for (const [key, value] of Object.entries(result)) {
                     if (value === null || value === undefined || value === '') continue;
                     if (key === 'phones' && Array.isArray(value) && value.length > 0) {

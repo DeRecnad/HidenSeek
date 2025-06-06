@@ -94,6 +94,27 @@ def serialize_result(result):
     # Всё остальное преобразуем в строку
     return str(result)
 
+# Функция для обработки поиска
+def handle_search(name, city, phone, platform_type):
+    logger.info(f"Начинаю поиск на платформе {platform_type}...")
+    try:
+        results, error = search(name=name, city=city, phone=phone, platform=platform_type, platform_configs=platform_configs)
+        logger.info(f"Результаты поиска для {platform_type}: {results}. Ошибка: {error if error else 'нет'}")
+        return results, error
+    except Exception as e:
+        logger.error(f"Произошла ошибка при поиске на {platform_type}: {str(e)}")
+        return None, str(e)
+
+# Функция для обработки загрузки изображений
+def handle_image_upload(file):
+    if file and file.filename:
+        filename = secure_filename(file.filename)
+        file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+        file.save(file_path)
+        logger.info(f"Изображение {filename} успешно загружено.")
+        return filename
+    return None
+
 # Главная страница приложения
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -150,112 +171,42 @@ def get_platforms():
     logger.info(f"Возвращаю список платформ для поиска: {platforms}")
     return jsonify(platforms)
 
-# API-метод для частичного поиска по платформам
+# Функция для объединения результатов поиска
+def combine_search_results(results_list):
+    combined_results = []
+    for results in results_list:
+        if results:
+            combined_results.extend(results)
+    return combined_results
+
+# Обновление маршрута для частичного поиска
 @app.route("/search_partial", methods=["POST"])
 def search_partial():
-    """
-    Выполняет поиск по указанной платформе и возвращает результаты в формате JSON.
-    Использует параметры поиска из сессии.
-    """
-    # Получаем данные из запроса (какая платформа)
     data = request.get_json()
     platform_type = data.get('platform')
-    logger.info(f"Получил запрос на частичный поиск для платформы: {platform_type}")
-
-    # Извлекаем параметры поиска из сессии
     search_params = session.get('search_params', {})
     name = search_params.get('name')
     city = search_params.get('city')
     phone = search_params.get('phone')
-    logger.info(f"Параметры поиска: имя={name}, город={city}, телефон={phone}, платформа={platform_type}")
-
-    # Приводим название платформы к нижнему регистру
     platform_type = platform_type.lower() if platform_type else None
-    logger.info(f"Привёл название платформы к нижнему регистру: {platform_type}")
-
-    # Проверяем, зарегистрирована ли платформа и активна ли она
     if platform_type in PLATFORM_REGISTRY and platform_configs.get(platform_type, {}).get("active", PLATFORM_REGISTRY[platform_type]["active_by_default"]):
-        platform_name = PLATFORM_REGISTRY[platform_type]["name"]
-        logger.info(f"Начинаю поиск на платформе {platform_name}...")
+        results, error = handle_search(name, city, phone, platform_type)
+        if error:
+            return jsonify({"status": error, "results": []}), 200
+        serialized_results = serialize_result(results)
+        combined_results = combine_search_results([serialized_results])
+        return jsonify({"status": f"Просматриваем {PLATFORM_REGISTRY[platform_type]['name']}...", "results": combined_results})
+    return jsonify({"status": "Платформа не найдена или неактивна", "results": []}), 404
 
-        try:
-            # Выполняем поиск с переданными параметрами
-            results, error = search(name=name, city=city, phone=phone, platform=platform_type, platform_configs=platform_configs)
-            logger.info(f"Результаты поиска для {platform_name}: {results}. Ошибка: {error if error else 'нет'}")
-
-            # Если есть ошибка, возвращаем её клиенту
-            if error:
-                logger.warning(f"Во время поиска на {platform_name} возникла ошибка: {error}")
-                return jsonify({"status": error, "results": []}), 200
-
-            # Логируем данные до и после сериализации
-            logger.info(f"Сырые данные перед сериализацией: {results}")
-            serialized_results = serialize_result(results)
-            logger.info(f"Сериализованные данные для {platform_name}: {serialized_results}")
-
-            # Возвращаем результаты поиска клиенту
-            return jsonify({"status": f"Просматриваем {platform_name}...", "results": serialized_results})
-        except Exception as e:
-            # Если произошла ошибка, логируем и возвращаем её клиенту
-            logger.error(f"Произошла ошибка при поиске на {platform_name}: {str(e)}")
-            return jsonify({"status": f"Ошибка при поиске на {platform_name}: {str(e)}", "results": []}), 500
-    # Если платформа не найдена или не активна
-    logger.warning(f"Платформа {platform_type} либо не зарегистрирована, либо не активна.")
-    return jsonify({"status": "Поиск завершён!", "results": []})
-
-# Страница загрузки изображения
+# Обновление маршрута для загрузки изображений
 @app.route("/upload_image", methods=["GET", "POST"])
 def upload_image():
-    """
-    Обрабатывает страницу загрузки изображения (upload_image.html).
-    Если это POST-запрос, загружает файл, обрабатывает его (например, конвертирует HEIC в JPEG),
-    извлекает EXIF-данные и сохраняет в базу данных.
-    """
-    logger.info("Открываю страницу загрузки изображения (upload_image.html).")
-    results = []
-    query = ""
-    if request.method == "POST" and "file" in request.files:
-        # Получаем файл из запроса
+    if request.method == "POST":
         file = request.files["file"]
-        if file.filename == "":
-            # Если файл не выбран, показываем ошибку
-            logger.warning("Пользователь не выбрал файл для загрузки.")
-            flash("No selected file")
-            return redirect(request.url)
-        try:
-            # Делаем имя файла безопасным
-            filename = secure_filename(file.filename)
-            logger.info(f"Получил файл: {filename}. Начинаю обработку...")
-            exif_data = None
-            # Если файл в формате HEIC, конвертируем в JPEG
-            if filename.lower().endswith('.heic'):
-                logger.info(f"Файл в формате HEIC. Конвертирую в JPEG...")
-                filename, exif_data = convert_heic_to_jpeg(file, filename, app.config["UPLOAD_FOLDER"])
-                logger.info(f"Конвертация завершена. Новый файл: {filename}")
-            else:
-                # Сохраняем файл как есть
-                file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-                logger.info(f"Сохраняю файл по пути: {file_path}")
-                file.save(file_path)
-                logger.info("Извлекаю EXIF-данные...")
-                exif_data = extract_exif_with_exiftool(file_path)
-            # Генерируем уникальный ID для изображения
-            image_id = int(datetime.now().timestamp())
-            logger.info(f"Присваиваю изображению ID: {image_id}")
-            # Сохраняем данные в базе
-            success, error = save_image(image_id, filename, exif_data)
-            if not success:
-                logger.error(f"Не удалось сохранить изображение в базе данных: {error}")
-                flash(error)
-                return redirect(request.url)
-            logger.info("Сохранил EXIF-данные в сессии. Перенаправляю на страницу результатов.")
-            session['exif_data'] = exif_data
+        filename = handle_image_upload(file)
+        if filename:
             return redirect(url_for("view_result", filename=filename))
-        except Exception as e:
-            logger.error(f"Ошибка при загрузке изображения: {str(e)}")
-            flash(f"Error uploading image: {str(e)}")
-            return redirect(request.url)
-    return render_template("upload_image.html", results=results, query=query)
+    return render_template("upload_image.html")
 
 # Страница отображения результата обработки изображения
 @app.route("/result/<filename>")

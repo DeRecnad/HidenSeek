@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Search Results</title>
+    <title>Результаты поиска</title>
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
 </head>
 <body>
     <div class="header">
-        <h1>Search Results</h1>
+        <h1>Результаты поиска</h1>
         <div>
-            <a href="/">Search</a>
-            <a href="/upload_image">Upload Image</a>
-            <a href="/history">History</a>
+            <a href="/">Поиск</a>
+            <a href="/upload_image">Загрузить фото</a>
+            <a href="/history">История</a>
         </div>
     </div>
     <div class="container">
@@ -21,15 +21,52 @@
         <!-- Общая информация -->
         <div id="aggregated-info" class="profile-card">
             <h2>Общая информация</h2>
-            <p><strong>ФИО:</strong> <span id="full-name">Загрузка...</span></p>
-            <p><strong>Адрес:</strong> <span id="address">Загрузка...</span></p>
-            <p><strong>Номер телефона:</strong> <span id="phone">Загрузка...</span></p>
-            <p><strong>Дата рождения:</strong> <span id="birth-date">Загрузка...</span></p>
-            <p><strong>IP:</strong> <span id="ip">Загрузка...</span></p>
+            <div class="info-section">
+                <h3>Основные данные</h3>
+                <p><strong>ФИО:</strong> <span id="full-name">Загрузка...</span></p>
+                <p><strong>Дата рождения:</strong> <span id="birth-date">Загрузка...</span></p>
+                <p><strong>Пол:</strong> <span id="gender">Загрузка...</span></p>
+                <p><strong>Возраст:</strong> <span id="age">Загрузка...</span></p>
+            </div>
+
+            <div class="info-section">
+                <h3>Контактная информация</h3>
+                <p><strong>Адрес:</strong> <span id="address">Загрузка...</span></p>
+                <p><strong>Номер телефона:</strong> <span id="phone">Загрузка...</span></p>
+                <p><strong>Email:</strong> <span id="email">Загрузка...</span></p>
+                <p><strong>IP:</strong> <span id="ip">Загрузка...</span></p>
+            </div>
+
+            <div class="info-section">
+                <h3>Образование и работа</h3>
+                <p><strong>Образование:</strong> <span id="education">Загрузка...</span></p>
+                <p><strong>Место работы:</strong> <span id="work">Загрузка...</span></p>
+                <p><strong>Должность:</strong> <span id="position">Загрузка...</span></p>
+            </div>
+
+            <div class="info-section">
+                <h3>Социальные сети</h3>
+                <div id="social-networks">
+                    <p><strong>ВКонтакте:</strong> <span id="vk-profile">Загрузка...</span></p>
+                    <p><strong>Telegram:</strong> <span id="telegram-profile">Загрузка...</span></p>
+                    <p><strong>Instagram:</strong> <span id="instagram-profile">Загрузка...</span></p>
+                    <p><strong>Facebook:</strong> <span id="facebook-profile">Загрузка...</span></p>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <h3>Дополнительная информация</h3>
+                <p><strong>Интересы:</strong> <span id="interests">Загрузка...</span></p>
+                <p><strong>Языки:</strong> <span id="languages">Загрузка...</span></p>
+                <p><strong>Семейное положение:</strong> <span id="relationship">Загрузка...</span></p>
+            </div>
         </div>
 
         <!-- Детали по платформам -->
-        <div id="platform-details"></div>
+        <div id="platform-details" class="platform-details">
+            <h2>Детальная информация по платформам</h2>
+            <div id="platform-cards"></div>
+        </div>
     </div>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>

@@ -599,3 +599,87 @@ input[type="text"]::placeholder {
 .user-card-details a:hover {
     color: #ff00cc;
 }
+
+.vk-profile {
+    background-color: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 10px 0;
+    white-space: pre-wrap;
+    font-family: 'IBM Plex Mono', monospace;
+    line-height: 1.5;
+    color: #e0e0e0;
+}
+
+.vk-profile .emoji {
+    margin-right: 5px;
+}
+
+.platform-card {
+    background-color: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.platform-card h3 {
+    color: #00ffcc;
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.5em;
+    font-family: 'Orbitron', sans-serif;
+}
+
+.platform-details {
+    font-size: 14px;
+    color: #e0e0e0;
+}
+
+.platform-details p {
+    margin: 8px 0;
+}
+
+.platform-details strong {
+    color: #00ffcc;
+    font-weight: 600;
+}
+
+.platform-details img {
+    max-width: 150px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    margin: 5px 0;
+}
+
+.phone-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 5px 0;
+}
+
+.phone-list li {
+    padding: 3px 0;
+    color: #00ffcc;
+}
+
+/* Стили для фотографий в профиле */
+.profile-photo {
+    max-width: 200px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+/* Стили для разделителей в профиле */
+.profile-section {
+    margin: 15px 0;
+    padding: 10px;
+    border-bottom: 1px solid #444;
+}
+
+.profile-section:last-child {
+    border-bottom: none;
+}

@@ -45,109 +45,101 @@ def register_platform(name, active_by_default=True):
 # Логируем начальное состояние реестра платформ
 logger.info(f"Изначально зарегистрированные платформы: {list(PLATFORM_REGISTRY.keys())}")
 
-def create_person_passport(platform_results_dict):
-    """
-    Создает компактный паспорт человека из данных всех платформ.
-    Включает только самые важные и проверенные данные.
-    """
-    # Импортируем конфигурацию платформ
-    from platform_configs import platform_configs
-
-    # Создаем словарь платформ динамически из конфигурации
-    platforms_dict = {platform: False for platform in platform_configs.keys()}
-
+def create_person_passport(results):
+    """Создает компактный паспорт человека из данных всех платформ"""
     passport = {
-        "basic_info": {
-            "full_name": None,
-            "username": None,
-            "photo": None,
-            "birth_date": None,
-            "location": None,
-            "status": None,
-            "last_seen": None
-        },
-        "contact_info": {
-            "phones": set(),
-            "emails": set(),
-            "social_links": set()
-        },
-        "devices": {
-            "mobile_devices": set(),
-            "browsers": set(),
-            "ip_addresses": set()
-        },
-        "platforms": platforms_dict,
-        "verification": {
-            "is_verified": False,
-            "verification_platform": None
+        'type': 'person_passport',
+        'data': {
+            'basic_info': {
+                'full_name': None,
+                'birth_date': None,
+                'gender': None,
+                'age': None,
+                'location': None,
+                'education': None,
+                'work': None,
+                'position': None
+            },
+            'contact_info': {
+                'phones': set(),
+                'emails': set()
+            },
+            'devices': {
+                'ip_addresses': set()
+            },
+            'platforms': {
+                'vk': False,
+                'telegram': False,
+                'instagram': False,
+                'facebook': False
+            }
         }
     }
 
-    # Обработка данных от каждой платформы
-    for platform_name, results in platform_results_dict.items():
-        if not results:
+    # Обрабатываем результаты от каждой платформы
+    for result in results:
+        if not result:
             continue
 
-        # Отмечаем наличие на платформе
-        platform_key = platform_name.lower()
-        if platform_key in passport["platforms"]:
-            passport["platforms"][platform_key] = True
+        # Отмечаем наличие платформы
+        if 'platform' in result:
+            platform = result['platform'].lower()
+            if platform in passport['data']['platforms']:
+                passport['data']['platforms'][platform] = True
 
-        for result in results:
-            # Базовая информация
-            if not passport["basic_info"]["full_name"] and result.get("full_name"):
-                passport["basic_info"]["full_name"] = result["full_name"]
-            
-            if not passport["basic_info"]["username"] and result.get("username"):
-                passport["basic_info"]["username"] = result["username"]
-            
-            if not passport["basic_info"]["photo"] and result.get("photo"):
-                passport["basic_info"]["photo"] = result["photo"]
-            
-            if not passport["basic_info"]["birth_date"] and result.get("bdate"):
-                passport["basic_info"]["birth_date"] = result["bdate"]
-            
-            if not passport["basic_info"]["location"] and result.get("city"):
-                passport["basic_info"]["location"] = result["city"]
-            
-            if not passport["basic_info"]["status"] and result.get("status"):
-                passport["basic_info"]["status"] = result["status"]
-            
-            if not passport["basic_info"]["last_seen"] and result.get("last_seen"):
-                passport["basic_info"]["last_seen"] = result["last_seen"]
+        # Основная информация
+        if result.get('full_name'):
+            passport['data']['basic_info']['full_name'] = result['full_name']
+        elif result.get('first_name') or result.get('last_name'):
+            name_parts = [result.get('first_name', ''), result.get('last_name', '')]
+            passport['data']['basic_info']['full_name'] = ' '.join(filter(None, name_parts))
 
-            # Контактная информация
-            if result.get("phones"):
-                passport["contact_info"]["phones"].update(result["phones"])
-            
-            if result.get("emails"):
-                passport["contact_info"]["emails"].update(result["emails"])
-            
-            if result.get("profile_link"):
-                passport["contact_info"]["social_links"].add(result["profile_link"])
+        if result.get('bdate'):
+            passport['data']['basic_info']['birth_date'] = result['bdate']
+        if result.get('sex'):
+            passport['data']['basic_info']['gender'] = result['sex']
+        if result.get('age'):
+            passport['data']['basic_info']['age'] = result['age']
+        if result.get('city'):
+            passport['data']['basic_info']['location'] = result['city']
+        if result.get('education'):
+            passport['data']['basic_info']['education'] = result['education']
 
-            # Информация об устройствах
-            if result.get("last_seen_device"):
-                passport["devices"]["mobile_devices"].add(result["last_seen_device"])
-            
-            if result.get("browser_info"):
-                passport["devices"]["browsers"].add(result["browser_info"])
-            
-            if result.get("ip_address"):
-                passport["devices"]["ip_addresses"].add(result["ip_address"])
+        # Работа
+        if result.get('career') and len(result['career']) > 0:
+            latest_job = result['career'][0]
+            if latest_job.get('company'):
+                passport['data']['basic_info']['work'] = latest_job['company']
+            if latest_job.get('position'):
+                passport['data']['basic_info']['position'] = latest_job['position']
 
-            # Верификация
-            if result.get("is_verified"):
-                passport["verification"]["is_verified"] = True
-                passport["verification"]["verification_platform"] = platform_name
+        # Контактная информация
+        if result.get('phone'):
+            passport['data']['contact_info']['phones'].add(result['phone'])
+        if result.get('phones'):
+            passport['data']['contact_info']['phones'].update(result['phones'])
+        if result.get('email'):
+            passport['data']['contact_info']['emails'].add(result['email'])
+        if result.get('emails'):
+            passport['data']['contact_info']['emails'].update(result['emails'])
 
-    # Преобразуем множества в списки для сериализации
-    passport["contact_info"]["phones"] = list(passport["contact_info"]["phones"])
-    passport["contact_info"]["emails"] = list(passport["contact_info"]["emails"])
-    passport["contact_info"]["social_links"] = list(passport["contact_info"]["social_links"])
-    passport["devices"]["mobile_devices"] = list(passport["devices"]["mobile_devices"])
-    passport["devices"]["browsers"] = list(passport["devices"]["browsers"])
-    passport["devices"]["ip_addresses"] = list(passport["devices"]["ip_addresses"])
+        # IP адреса
+        if result.get('ip'):
+            passport['data']['devices']['ip_addresses'].add(result['ip'])
+        if result.get('ip_addresses'):
+            passport['data']['devices']['ip_addresses'].update(result['ip_addresses'])
+
+    # Преобразуем множества в списки
+    passport['data']['contact_info']['phones'] = list(passport['data']['contact_info']['phones'])
+    passport['data']['contact_info']['emails'] = list(passport['data']['contact_info']['emails'])
+    passport['data']['devices']['ip_addresses'] = list(passport['data']['devices']['ip_addresses'])
+
+    # Заменяем None на "Неизвестно"
+    for section in passport['data'].values():
+        if isinstance(section, dict):
+            for key, value in section.items():
+                if value is None:
+                    section[key] = "Неизвестно"
 
     return passport
 
@@ -220,13 +212,10 @@ def search(name=None, city=None, phone=None, api_params=None, platform=None, pla
         return results, "; ".join(errors) if errors else None
 
     # Создаем паспорт человека из собранных данных
-    person_passport = create_person_passport(platform_results_dict)
+    person_passport = create_person_passport(results)
     
     # Добавляем паспорт в результаты
-    results.append({
-        "type": "person_passport",
-        "data": person_passport
-    })
+    results.append(person_passport)
 
     # Агрегация данных (выполняется только если platform=None)
     logger.info("Начинаю агрегацию данных из всех платформ...")

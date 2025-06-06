@@ -164,14 +164,7 @@ document.addEventListener('DOMContentLoaded', function() {
             ip: 'Загрузка...',
             education: 'Загрузка...',
             work: 'Загрузка...',
-            position: 'Загрузка...',
-            vkProfile: 'Загрузка...',
-            telegramProfile: 'Загрузка...',
-            instagramProfile: 'Загрузка...',
-            facebookProfile: 'Загрузка...',
-            interests: 'Загрузка...',
-            languages: 'Загрузка...',
-            relationship: 'Загрузка...'
+            position: 'Загрузка...'
         };
 
         // Обходим массив данных и агрегируем информацию
@@ -206,29 +199,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (latestJob.company && latestJob.company !== 'Загрузка...') aggregated.work = latestJob.company;
                 if (latestJob.position && latestJob.position !== 'Загрузка...') aggregated.position = latestJob.position;
             }
-
-            // Социальные сети
-            if (data.platform === 'vk' && data.profile_link && data.profile_link !== 'Загрузка...') {
-                aggregated.vkProfile = data.profile_link;
-            }
-            if (data.platform === 'telegram' && data.profile_link && data.profile_link !== 'Загрузка...') {
-                aggregated.telegramProfile = data.profile_link;
-            }
-            if (data.platform === 'instagram' && data.profile_link && data.profile_link !== 'Загрузка...') {
-                aggregated.instagramProfile = data.profile_link;
-            }
-            if (data.platform === 'facebook' && data.profile_link && data.profile_link !== 'Загрузка...') {
-                aggregated.facebookProfile = data.profile_link;
-            }
-
-            // Дополнительная информация
-            if (data.interests && data.interests !== 'Загрузка...') aggregated.interests = data.interests;
-            if (data.personal_info && data.personal_info.languages && data.personal_info.languages !== 'Загрузка...') {
-                aggregated.languages = data.personal_info.languages;
-            }
-            if (data.relation && data.relation !== 'Загрузка...') aggregated.relationship = data.relation;
         });
-
+        
         // Обновляем элементы на странице
         const elements = {
             'full-name': aggregated.fullName,
@@ -241,14 +213,7 @@ document.addEventListener('DOMContentLoaded', function() {
             'ip': aggregated.ip,
             'education': aggregated.education,
             'work': aggregated.work,
-            'position': aggregated.position,
-            'vk-profile': aggregated.vkProfile,
-            'telegram-profile': aggregated.telegramProfile,
-            'instagram-profile': aggregated.instagramProfile,
-            'facebook-profile': aggregated.facebookProfile,
-            'interests': aggregated.interests,
-            'languages': aggregated.languages,
-            'relationship': aggregated.relationship
+            'position': aggregated.position
         };
 
         // Обновляем все элементы
@@ -258,10 +223,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Обновляем только если новое значение не "Загрузка..." или "Неизвестно"
                 if (value !== 'Загрузка...' && value !== 'Неизвестно') {
                     element.textContent = value;
-                    // Если это ссылка на профиль, делаем её кликабельной
-                    if (id.endsWith('-profile')) {
-                        element.innerHTML = `<a href="${value}" target="_blank">${value}</a>`;
-                    }
                 }
             }
         }

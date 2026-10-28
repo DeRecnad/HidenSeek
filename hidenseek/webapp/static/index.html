@@ -54,7 +54,7 @@
     <div class="nav-label">СЕАНС</div>
     <nav class="nav-list">
       <button class="nav-item" data-view="start"><span class="ico">＋</span>Аудиты</button>
-      <button class="nav-item" data-view="settings"><span class="ico">⚙</span>Настройки и данные</button>
+      <button class="nav-item" data-view="data"><span class="ico">⚙</span>Настройки и данные</button>
       <button class="nav-item" data-view="about"><span class="ico">?</span>О проекте</button>
     </nav>
   </div>
@@ -310,8 +310,8 @@
     </div>
     <div class="terminal tall" id="fullTerminal"></div></div></section>
 
-  <!-- SETTINGS -->
-  <section class="view" id="view-settings"><div class="panel"><div class="panel-head"><div class="left"><span class="sigil">⚙</span> НАСТРОЙКИ И ДАННЫЕ</div></div><div class="panel-body">
+  <!-- DATA / SETTINGS -->
+  <section class="view" id="view-data"><div class="panel"><div class="panel-head"><div class="left"><span class="sigil">⚙</span> НАСТРОЙКИ И ДАННЫЕ</div></div><div class="panel-body">
     <div class="queue-row"><span class="queue-icon">●</span><div><label class="check"><input type="checkbox" id="saveToggle"> Сохранить аудит на диск</label><small>без отметки ничего не пишется на диск; файлы — в data/audits/</small></div><span class="queue-state" id="saveState">MEMORY</span></div>
     <div class="queue-row"><span class="queue-icon">●</span><div>SMTP для кода на почту<small>SMTP_* в .env</small></div><span class="queue-state" id="cfgSmtp">—</span></div>
     <div class="queue-row"><span class="queue-icon">●</span><div>GitHub OAuth<small>GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET; callback: <span class="mono" id="cbUrl"></span></small></div><span class="queue-state" id="cfgGh">—</span></div>

@@ -82,3 +82,13 @@ pytest
 
 CLI (typer + rich), diff между аудитами, шифрование базы (Fernet), экспорт отчёта в HTML,
 desktop-обёртка (pywebview), ИИ-ассистент через Anthropic API, theHarvester.
+
+## Онлайн-демо без сервера
+
+```bash
+python tools/build_static_demo.py build/hidenseek-demo.html
+```
+
+Собирает одну HTML-страницу с учебным режимом: аудиты демо-персонажей считаются настоящим
+кодом проекта и вшиваются в страницу, а `tools/static_demo_shim.js` подменяет API в браузере.
+Страницу можно открыть с телефона или выложить на GitHub Pages. Реального поиска в ней нет.

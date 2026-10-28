@@ -71,6 +71,47 @@ class NormalizeIn(BaseModel):
     value: str
 
 
+def audit_view(a: Audit, settings: Settings, registry: dict[str, Module]) -> dict:
+    """Всё, что нужно интерфейсу об одном аудите: идентификаторы, находки, модули, отчёт, граф."""
+    ttl = settings.verify_ttl_days
+    idents = []
+    for i in a.identities:
+        d = i.model_dump(mode="json")
+        d["state"] = "verified" if a.is_verified(i, ttl) else i.verification_state(ttl)
+        d["runs_modules"] = d["state"] == "verified"
+        idents.append(d)
+    modules = []
+    for m in registry.values():
+        info = m.info(settings)
+        info["enabled"] = m.name not in a.disabled_modules
+        st = a.sources.get(m.name)
+        info["status"] = st.model_dump(mode="json") if st else None
+        modules.append(info)
+    data = a.model_dump(mode="json", exclude={"identities", "findings", "exposures", "sources"})
+    data.update({
+        "identities": idents,
+        "findings": [f.model_dump(mode="json") for f in a.findings],
+        "modules": modules,
+        "report": report_mod.build(a, settings),
+        "graph": graph_mod.build(a, settings),
+        "verify_ttl_days": ttl,
+    })
+    return data
+
+
+def config_view(settings: Settings) -> dict:
+    return {
+        "version": __version__,
+        "smtp_configured": settings.smtp_configured,
+        "github_oauth_configured": settings.github_oauth_configured,
+        "hibp_configured": bool(settings.hibp_api_key),
+        "verify_ttl_days": settings.verify_ttl_days,
+        "personas": {k: {"title": v["title"], "description": v["description"]} for k, v in PERSONAS.items()},
+        "txt_prefix": TXT_PREFIX,
+        "well_known_path": WELL_KNOWN_PATH,
+    }
+
+
 def create_app(
     settings: Settings = default_settings,
     verifier: Optional[Verifier] = None,
@@ -122,45 +163,12 @@ def create_app(
         store.persist(a)
 
     def view(a: Audit) -> dict:
-        ttl = settings.verify_ttl_days
-        reg = registry_for(a)
-        idents = []
-        for i in a.identities:
-            d = i.model_dump(mode="json")
-            d["state"] = "verified" if a.is_verified(i, ttl) else i.verification_state(ttl)
-            d["runs_modules"] = d["state"] == "verified"
-            idents.append(d)
-        modules = []
-        for m in reg.values():
-            info = m.info(settings)
-            info["enabled"] = m.name not in a.disabled_modules
-            st = a.sources.get(m.name)
-            info["status"] = st.model_dump(mode="json") if st else None
-            modules.append(info)
-        data = a.model_dump(mode="json", exclude={"identities", "findings", "exposures", "sources"})
-        data.update({
-            "identities": idents,
-            "findings": [f.model_dump(mode="json") for f in a.findings],
-            "modules": modules,
-            "report": report_mod.build(a, settings),
-            "graph": graph_mod.build(a, settings),
-            "verify_ttl_days": ttl,
-        })
-        return data
+        return audit_view(a, settings, registry_for(a))
 
     # ---------- config / meta ----------
     @app.get("/api/config")
     def config():
-        return {
-            "version": __version__,
-            "smtp_configured": settings.smtp_configured,
-            "github_oauth_configured": settings.github_oauth_configured,
-            "hibp_configured": bool(settings.hibp_api_key),
-            "verify_ttl_days": settings.verify_ttl_days,
-            "personas": {k: {"title": v["title"], "description": v["description"]} for k, v in PERSONAS.items()},
-            "txt_prefix": TXT_PREFIX,
-            "well_known_path": WELL_KNOWN_PATH,
-        }
+        return config_view(settings)
 
     @app.post("/api/normalize")
     def normalize(body: NormalizeIn):

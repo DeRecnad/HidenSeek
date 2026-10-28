@@ -71,7 +71,7 @@ const TITLES = {
   normalize: ['TOOLS', 'Нормализация', 'Как сверка сравнивает имена, ники и телефоны.'],
   assistant: ['TOOLS', 'Ассистент', 'Объясняет находки и подсказывает, что делать.'],
   terminal: ['TOOLS', 'Журнал', 'Все события текущего аудита.'],
-  settings: ['SESSION', 'Настройки и данные', 'Хранение, выгрузка и удаление данных.'],
+  data: ['SESSION', 'Настройки и данные', 'Хранение, выгрузка и удаление данных.'],
   about: ['ABOUT', 'О проекте', 'HidenSeek — аудит собственного цифрового следа.'],
 };
 
@@ -95,7 +95,7 @@ function showView(name, {push = true} = {}) {
   const [eb, t, sub] = TITLES[name];
   $('#eyebrow').textContent = eb + (S.audit ? ' // ' + S.audit.id.toUpperCase() : '');
   $('#pageTitle').textContent = t; $('#pageSub').textContent = sub;
-  const showStrip = S.audit && !['start', 'settings', 'about', 'normalize', 'assistant'].includes(name);
+  const showStrip = S.audit && !['start', 'data', 'about', 'normalize', 'assistant'].includes(name);
   $('#caseStrip').style.display = showStrip ? '' : 'none';
   $('.worktabs').style.display = showStrip ? '' : 'none';
   if (push && location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
@@ -467,7 +467,11 @@ async function runAudit(module) {
 }
 $('#runBtn').addEventListener('click', () => runAudit());
 $('#newRealBtn').addEventListener('click', () => newAudit('real'));
-const doExport = () => { if (S.audit) location.href = `/api/audits/${S.audit.id}/export`; };
+const doExport = () => {
+  if (!S.audit) return;
+  if (window.HS_EXPORT) { window.HS_EXPORT(S.audit); return; }  // онлайн-демо без сервера
+  location.href = `/api/audits/${S.audit.id}/export`;
+};
 ['#exportBtn', '#exportBtn2', '#exportBtn3'].forEach(s => $(s).addEventListener('click', doExport));
 $('#saveToggle').addEventListener('change', async e => {
   if (!S.audit) return;
@@ -698,7 +702,7 @@ $('#langBtn').addEventListener('click', () => notify('English UI is planned; Hid
   try { await loadConfig(); } catch (e) { notify('✕ API недоступен: ' + e.message); return; }
   const params = new URLSearchParams(location.search);
   if (params.get('verify_error')) notify('✕ ' + params.get('verify_error'));
-  const id = params.get('audit') || lsGet('hs_audit');
+  const id = params.get('audit') || window.HS_BOOT_AUDIT || lsGet('hs_audit');
   if (params.has('audit') || params.has('verify_error')) history.replaceState(null, '', location.pathname + location.hash);
   if (id) await openAudit(id);
   await loadList();

@@ -16,7 +16,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def utcnow() -> datetime:
@@ -52,6 +52,7 @@ class Identity(BaseModel):
     verified_by: Optional[str] = None  # email_code | dns_txt | github_oauth | inherited:<idn> | domain_link:<idn> | demo
     verified_at: Optional[datetime] = None
     parent_id: Optional[str] = None  # от какого подтверждённого идентификатора унаследовано
+    verify_token: Optional[str] = None  # токен для TXT-записи домена; публичен по своей природе
     added_at: datetime = Field(default_factory=utcnow)
 
     def is_verified(self, ttl_days: int, now: Optional[datetime] = None) -> bool:
@@ -81,6 +82,13 @@ class Finding(BaseModel):
     identity_id: str  # какой подтверждённый идентификатор привёл к находке
     exposes: list[str] = Field(default_factory=list)
     data: dict[str, Any] = Field(default_factory=dict)
+    last_seen: Optional[datetime] = None
+    gone_at: Optional[datetime] = None  # не найдена при последней успешной проверке источника
+    resolved_at: Optional[datetime] = None  # вы отметили «закрыл»: удалил аккаунт, сменил пароль и т.п.
+
+    @property
+    def active(self) -> bool:
+        return self.gone_at is None and self.status != "not_mine"
 
 
 class Exposure(BaseModel):
@@ -93,7 +101,20 @@ class Exposure(BaseModel):
 class HistoryEntry(BaseModel):
     finding_id: str
     change: Literal["new", "gone", "changed"]
+    run: int = 0
     at: datetime = Field(default_factory=utcnow)
+
+
+class RunRecord(BaseModel):
+    """Один запуск аудита; повторные запуски сравниваются между собой (diff)."""
+    n: int
+    started_at: datetime = Field(default_factory=utcnow)
+    finished_at: Optional[datetime] = None
+    module: Optional[str] = None
+    scheduled: bool = False
+    new: int = 0
+    gone: int = 0
+    changed: int = 0
 
 
 class SourceStatus(BaseModel):
@@ -126,8 +147,16 @@ class Audit(BaseModel):
     history: list[HistoryEntry] = Field(default_factory=list)
     sources: dict[str, SourceStatus] = Field(default_factory=dict)
     disabled_modules: list[str] = Field(default_factory=list)
+    suppressed: list[str] = Field(default_factory=list)  # «type:value», удалённые вами унаследованные идентификаторы
+    runs: list[RunRecord] = Field(default_factory=list)
+    schedule_hours: Optional[int] = None  # периодический повторный аудит
+    assistant_consent: bool = False  # разрешено отправлять сводку в Anthropic API
     log: list[LogLine] = Field(default_factory=list)
     running: bool = False
+
+    @staticmethod
+    def suppress_key(type_: str, value: str) -> str:
+        return f"{type_}:{value.strip().lower()}"
 
     def identity(self, identity_id: str) -> Optional[Identity]:
         return next((i for i in self.identities if i.id == identity_id), None)

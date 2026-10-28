@@ -4,6 +4,8 @@ from __future__ import annotations
 from .base import Fact, Module, ModuleError, ModuleResult, NewFact, RawFinding, RunContext, expect_json
 
 API = "https://api.github.com"
+PER_PAGE = 100
+MAX_PAGES = 5  # поиск коммитов отдаёт не больше 1000 результатов
 PROFILE_FIELDS = ("name", "company", "blog", "location", "email", "bio", "twitter_username")
 
 
@@ -34,12 +36,19 @@ class GitHubModule(Module):
         ))
 
         # Только коммиты, автор которых — этот (подтверждённый) аккаунт: адреса других участников не берём.
-        search = expect_json(await ctx.client.get(
-            f"{API}/search/commits", params={"q": f"author:{login}", "per_page": 100, "sort": "author-date"},
-            headers=h,
-        ), dict)
+        items: list[dict] = []
+        for page in range(1, MAX_PAGES + 1):
+            search = expect_json(await ctx.client.get(
+                f"{API}/search/commits",
+                params={"q": f"author:{login}", "per_page": PER_PAGE, "page": page, "sort": "author-date"},
+                headers=h,
+            ), dict)
+            batch = search.get("items") or []
+            items.extend(batch)
+            if len(batch) < PER_PAGE or len(items) >= (search.get("total_count") or 0):
+                break
         emails: dict[str, dict] = {}
-        for item in search.get("items") or []:
+        for item in items:
             author_login = ((item.get("author") or {}).get("login") or "").lower()
             if author_login != login.lower():
                 continue
@@ -61,6 +70,10 @@ class GitHubModule(Module):
             # GitHub привязывает коммит к аккаунту только по подтверждённому на нём адресу.
             res.new_facts.append(NewFact("email", email, inherits=True,
                                          reason="адрес привязан к подтверждённому GitHub-аккаунту"))
+        notes = [f"просмотрено коммитов: {len(items)}"]
         if not emails:
-            res.note = "в публичных коммитах только noreply-адреса или коммитов нет"
+            notes.append("в них только noreply-адреса или коммитов нет")
+        if not ctx.settings.github_token:
+            notes.append("без GITHUB_TOKEN поиск ограничен 10 запросами в минуту")
+        res.note = "; ".join(notes)
         return res

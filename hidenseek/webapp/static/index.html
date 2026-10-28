@@ -64,7 +64,7 @@
   <div class="breadcrumb"><span>HIDENSEEK</span> / <span>SELF-AUDIT</span> / <b style="color:#b5c7b8;font-weight:400" id="crumbId">—</b></div>
   <section class="pagehead">
     <div><div class="eyebrow" id="eyebrow">PERSONAL FOOTPRINT</div><h1 id="pageTitle">Мой цифровой след</h1><div class="subtitle" id="pageSub">Что обо мне видно снаружи и что стоит закрыть. Поиск запускают только подтверждённые идентификаторы.</div></div>
-    <div class="head-actions"><button class="btn" id="exportBtn" disabled>↧ ЭКСПОРТ JSON</button><button class="btn primary" id="runBtn" disabled>▶ ЗАПУСТИТЬ АУДИТ</button></div>
+    <div class="head-actions"><button class="btn" id="exportBtn" disabled>↧ ОТЧЁТ HTML</button><button class="btn primary" id="runBtn" disabled>▶ ЗАПУСТИТЬ АУДИТ</button></div>
   </section>
 
   <!-- START -->
@@ -116,9 +116,19 @@
 
   <!-- OVERVIEW -->
   <section class="view" id="view-case">
+    <div class="panel onboarding" id="onboarding" hidden>
+      <div class="panel-head"><div class="left"><span class="sigil">›</span> ПЕРВЫЕ ШАГИ</div><span class="dim" id="onbCount">0 / 4</span></div>
+      <div class="panel-body"><ol class="onb-steps" id="onbSteps"></ol></div>
+    </div>
     <div class="panel summary-panel">
       <div class="panel-head"><div class="left"><span class="sigil">!</span> СВОДКА</div><span class="dim" id="sevLabel">—</span></div>
-      <div class="panel-body"><div id="summaryText" class="summary-text">—</div><div id="summaryChips" class="candidate-tags"></div><div id="conflictBox"></div></div>
+      <div class="panel-body"><div id="summaryText" class="summary-text">—</div><div id="summaryChips" class="candidate-tags"></div>
+        <div class="progress-row" id="progressRow" hidden><div class="progress"><span id="progressBar"></span></div><span class="hint" id="progressText"></span></div>
+        <div id="conflictBox"></div></div>
+    </div>
+    <div class="panel" id="diffPanel" style="margin-top:16px" hidden>
+      <div class="panel-head"><div class="left"><span class="sigil">±</span> ИЗМЕНЕНИЯ С ПРОШЛОГО АУДИТА</div><span class="dim" id="diffMeta"></span></div>
+      <div class="panel-body evidence-list" id="diffList"></div>
     </div>
     <div class="workspace-grid" style="margin-top:16px">
       <div class="panel">
@@ -247,7 +257,7 @@
     <div class="panel">
       <div class="panel-head"><div class="left"><span class="sigil">▤</span> РЕЕСТР НАХОДОК</div><span class="dim" id="findCount">0</span></div>
       <div class="log-filters" id="findFilters">
-        <button class="log-filter active" data-f="all">ВСЕ</button><button class="log-filter" data-f="review">НА ПРОВЕРКЕ</button><button class="log-filter" data-f="mine">МОИ</button><button class="log-filter" data-f="not_mine">НЕ МОИ</button><button class="log-filter" data-f="exposed">С РАСКРЫТИЯМИ</button>
+        <button class="log-filter active" data-f="all">ВСЕ</button><button class="log-filter" data-f="review">НА ПРОВЕРКЕ</button><button class="log-filter" data-f="mine">МОИ</button><button class="log-filter" data-f="not_mine">НЕ МОИ</button><button class="log-filter" data-f="exposed">С РАСКРЫТИЯМИ</button><button class="log-filter" data-f="changes">ИЗМЕНЕНИЯ</button><button class="log-filter" data-f="gone">ИСЧЕЗЛИ</button>
       </div>
       <div class="source-table-wrap"><table class="source-table"><thead><tr><th>НАХОДКА</th><th>ТИП</th><th>ИСТОЧНИК</th><th>РАСКРЫВАЕТ</th><th>CONF.</th><th>СТАТУС</th><th>ДАТА</th></tr></thead><tbody id="findTable"></tbody></table></div>
       <div class="panel-foot"><span>ФАКТ = ИСТОЧНИК + ДАТА + CONFIDENCE</span><span>КЛИК — ДЕТАЛИ И РЕКОМЕНДАЦИИ</span></div>
@@ -257,9 +267,9 @@
   <!-- REPORT -->
   <section class="view" id="view-report">
     <div class="panel">
-      <div class="panel-head"><div class="left"><span class="sigil">!</span> ОТЧЁТ И РЕКОМЕНДАЦИИ</div><button class="btn small" id="exportBtn2">↧ ЭКСПОРТ JSON</button></div>
+      <div class="panel-head"><div class="left"><span class="sigil">!</span> ОТЧЁТ И РЕКОМЕНДАЦИИ</div><button class="btn small" id="exportBtn2">↧ ОТЧЁТ HTML</button></div>
       <div class="panel-body"><div class="summary-text" id="reportSummary"></div><div id="reportItems"></div></div>
-      <div class="panel-foot"><span>SEVERITY: ПАРОЛЬ В УТЕЧКЕ &gt; ИМЯ + ГОРОД &gt; ЗАНЯТЫЙ НИК</span><span>DIFF МЕЖДУ АУДИТАМИ — СЛЕДУЮЩИЙ ЭТАП</span></div>
+      <div class="panel-foot"><span>SEVERITY: ПАРОЛЬ В УТЕЧКЕ &gt; ИМЯ + ГОРОД &gt; ЗАНЯТЫЙ НИК</span><span>«✓ ЗАКРЫЛ» — ВАШ ЧЕК-ЛИСТ; ПОВТОРНЫЙ АУДИТ ПРОВЕРИТ</span></div>
     </div>
   </section>
 
@@ -294,9 +304,10 @@
   <!-- ASSISTANT -->
   <section class="view" id="view-assistant">
     <div class="panel">
-      <div class="panel-head"><div class="left"><span class="sigil">◈</span> АССИСТЕНТ</div><span class="dim">ЗАГОТОВКА · ПО КЛЮЧЕВЫМ СЛОВАМ</span></div>
+      <div class="panel-head"><div class="left"><span class="sigil">◈</span> АССИСТЕНТ</div><span class="dim" id="assistantMode">ЗАГОТОВКИ</span></div>
       <div class="panel-body" style="padding:0">
-        <div class="assistant-note">Объясняет находки и подсказывает, как закрыть утечку. Сейчас — заготовки по ключевым словам; позже — Anthropic API на бэкенде (раздел 9.1).</div>
+        <div class="assistant-note" id="assistantNote">Объясняет находки и подсказывает, как закрыть утечку.</div>
+        <div class="assistant-consent" id="assistantConsentRow" hidden><label class="check"><input type="checkbox" id="assistantConsent"> Разрешить отправлять вопрос и сводку отчёта в Anthropic API</label><small>Адреса почты и телефоны маскируются, ФИО из профиля не отправляется. Без согласия ассистент отвечает заготовками.</small></div>
         <div id="assistantLog" class="assistant-log"></div>
         <form id="assistantForm" class="assistant-form"><input id="assistantInput" placeholder="Спроси про утечку, коммиты, ник, confidence…" autocomplete="off"><button class="btn primary">→</button></form>
       </div>
@@ -313,6 +324,11 @@
   <!-- DATA / SETTINGS -->
   <section class="view" id="view-data"><div class="panel"><div class="panel-head"><div class="left"><span class="sigil">⚙</span> НАСТРОЙКИ И ДАННЫЕ</div></div><div class="panel-body">
     <div class="queue-row"><span class="queue-icon">●</span><div><label class="check"><input type="checkbox" id="saveToggle"> Сохранить аудит на диск</label><small>без отметки ничего не пишется на диск; файлы — в data/audits/</small></div><span class="queue-state" id="saveState">MEMORY</span></div>
+    <div class="queue-row"><span class="queue-icon">●</span><div>Шифрование сохранённых аудитов<small id="encHint">Fernet; ключ — вне репозитория (~/.config/hidenseek/key или HIDENSEEK_KEY)</small></div><span class="queue-state" id="cfgEnc">—</span></div>
+    <div class="queue-row"><span class="queue-icon">●</span><div><label for="scheduleSel">Повторный аудит по расписанию</label><small>новые находки появятся в «Изменениях»; работает, пока открыт сайт (или cron: hidenseek run &lt;id&gt;)</small></div>
+      <select id="scheduleSel" class="mini-select"><option value="">ВЫКЛ</option></select></div>
+    <div class="queue-row"><span class="queue-icon">●</span><div>ИИ-ассистент<small>ANTHROPIC_API_KEY в .env; согласие — на экране ассистента</small></div><span class="queue-state" id="cfgAi">—</span></div>
+    <div class="queue-row"><span class="queue-icon">●</span><div>Разбор моих страниц<small>после отметки «мой» читается только эта страница: видно ли на ней имя и город</small></div><span class="queue-state" id="cfgOwn">—</span></div>
     <div class="queue-row"><span class="queue-icon">●</span><div>SMTP для кода на почту<small>SMTP_* в .env</small></div><span class="queue-state" id="cfgSmtp">—</span></div>
     <div class="queue-row"><span class="queue-icon">●</span><div>GitHub OAuth<small>GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET; callback: <span class="mono" id="cbUrl"></span></small></div><span class="queue-state" id="cfgGh">—</span></div>
     <div class="queue-row"><span class="queue-icon">●</span><div>HaveIBeenPwned<small>HIBP_API_KEY (ключ платный)</small></div><span class="queue-state" id="cfgHibp">—</span></div>
@@ -320,6 +336,7 @@
     <div class="queue-row"><span class="queue-icon">●</span><div>Visual Mode<small>WIRED / MONOCHROME / CRT / CLEAN</small></div><span class="queue-state" id="settingsTheme">WIRED</span></div>
     <div class="danger-zone">
       <button class="btn" id="exportBtn3">↧ ПОЛНАЯ ВЫГРУЗКА (JSON)</button>
+      <button class="btn" id="exportBtn4">↧ ОТЧЁТ HTML</button>
       <button class="btn danger" id="deleteAuditBtn">✕ УДАЛИТЬ ЭТОТ АУДИТ</button>
       <button class="btn danger" id="wipeBtn">✕ УДАЛИТЬ ВСЕ ДАННЫЕ</button>
     </div>

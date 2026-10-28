@@ -7,6 +7,11 @@ from hidenseek.config import Settings
 def settings(tmp_path):
     s = Settings()
     s.data_dir = tmp_path
+    s.key_file = tmp_path / "key"
+    s.key = ""
+    s.encrypt = True
+    s.anthropic_api_key = ""
+    s.scheduler_interval = 3600
     s.module_delay = 0.0
     s.module_retries = 2
     s.smtp_host = s.smtp_from = ""

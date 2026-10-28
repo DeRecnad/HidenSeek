@@ -30,6 +30,7 @@ from .normalizer import normalize_username
 
 CODE_TTL_SECONDS = 15 * 60
 CODE_MAX_ATTEMPTS = 5
+CODE_RESEND_SECONDS = 60
 TXT_PREFIX = "hidenseek-verify="
 WELL_KNOWN_PATH = "/.well-known/hidenseek.txt"
 
@@ -49,8 +50,13 @@ def mark_verified(identity: Identity, method: str, parent: Optional[Identity] = 
     identity.parent_id = parent.id if parent else None
 
 
-def add_inherited(audit: Audit, type_: IdentityType, value: str, parent: Identity, method: str) -> Identity:
-    """Добавить (или переподтвердить) идентификатор, который наследует подтверждение от parent."""
+def add_inherited(audit: Audit, type_: IdentityType, value: str, parent: Identity, method: str) -> Optional[Identity]:
+    """Добавить (или переподтвердить) идентификатор, который наследует подтверждение от parent.
+
+    None — вы раньше удалили этот идентификатор, и он не возвращается сам.
+    """
+    if Audit.suppress_key(type_.value, value) in audit.suppressed:
+        return None
     existing = next((i for i in audit.identities if i.type == type_ and i.value.lower() == value.lower()), None)
     if existing and existing.verified_by and not existing.parent_id:
         return existing  # уже подтверждён напрямую — прямое подтверждение сильнее наследованного
@@ -122,7 +128,7 @@ class Verifier:
     resolve_txt: TxtResolver = doh_txt_resolver
     fetch_text: TextFetcher = https_fetch_text
     _codes: dict[str, _PendingCode] = field(default_factory=dict)
-    _domain_tokens: dict[str, str] = field(default_factory=dict)
+    _last_sent: dict[str, float] = field(default_factory=dict)
     _oauth_states: dict[str, tuple[str, float]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -139,6 +145,9 @@ class Verifier:
             raise VerificationError("Это не email")
         if not self.send_email:
             raise VerificationError("SMTP не настроен: заполните SMTP_* в .env (см. .env.example)")
+        wait = CODE_RESEND_SECONDS - (time.time() - self._last_sent.get(identity.id, 0))
+        if wait > 0:
+            raise VerificationError(f"Письмо уже отправлено — повторно можно через {int(wait) + 1} с")
         code = f"{secrets.randbelow(10**6):06d}"
         self._codes[identity.id] = _PendingCode(self._digest(identity.id, code), time.time() + CODE_TTL_SECONDS)
         try:
@@ -146,6 +155,7 @@ class Verifier:
         except Exception as e:  # noqa: BLE001 — показать пользователю причину
             self._codes.pop(identity.id, None)
             raise VerificationError(f"Не удалось отправить письмо: {e}") from e
+        self._last_sent[identity.id] = time.time()
 
     def confirm_email(self, identity: Identity, code: str) -> None:
         pending = self._codes.get(identity.id)
@@ -163,12 +173,15 @@ class Verifier:
 
     # ---------- domain ----------
     def domain_token(self, identity: Identity) -> str:
+        """Токен хранится в самом идентификаторе: перезапуск сервера не заставит менять DNS-запись."""
         if identity.type != IdentityType.DOMAIN:
             raise VerificationError("Это не домен")
-        return self._domain_tokens.setdefault(identity.id, secrets.token_urlsafe(18))
+        if not identity.verify_token:
+            identity.verify_token = secrets.token_urlsafe(18)
+        return identity.verify_token
 
     async def check_domain(self, identity: Identity) -> None:
-        token = self._domain_tokens.get(identity.id)
+        token = identity.verify_token
         if not token:
             raise VerificationError("Сначала получите токен для TXT-записи")
         expected = TXT_PREFIX + token
@@ -266,6 +279,8 @@ def apply_github_login(audit: Audit, login: str, verified_emails: list[str]) -> 
         gh = Identity(type=IdentityType.GITHUB, value=login)
         audit.identities.append(gh)
     mark_verified(gh, "github_oauth")
+    if Audit.suppress_key("github", login) in audit.suppressed:
+        audit.suppressed.remove(Audit.suppress_key("github", login))  # вы снова вошли — значит, вернуть
     add_inherited(audit, IdentityType.USERNAME, login, gh, f"inherited:{gh.id}")
     for email in verified_emails:
         add_inherited(audit, IdentityType.EMAIL, email.lower(), gh, "github_oauth_email")

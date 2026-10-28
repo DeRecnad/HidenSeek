@@ -108,3 +108,25 @@ body.running .live-dot{background:var(--amber);box-shadow:0 0 8px var(--amber)}
 }
 .nav-item{border:0;border-left:2px solid transparent;width:100%;text-align:left;font-family:var(--sans)}
 @media(max-width:900px){.ctx-panel:not(.sheet-open){visibility:hidden;transition:transform .22s ease,visibility 0s .22s}}
+
+/* 0.2: сравнение аудитов, чек-лист, первые шаги, расписание, ассистент */
+[hidden]{display:none!important}
+.onboarding{margin-bottom:16px;border-color:#245331}
+.onb-steps{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.onb-steps li{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font:13px/1.5 var(--sans);color:var(--muted)}
+.onb-steps li span{display:inline-grid;place-items:center;width:22px;height:22px;border:1px solid var(--line2);font:10px var(--mono);flex-shrink:0}
+.onb-steps li.done{color:var(--dim);text-decoration:line-through}
+.onb-steps li.done span{border-color:#245331;color:var(--green)}
+.onb-steps li.next{color:var(--text)}
+.onb-steps li.next span{border-color:var(--green);color:var(--green)}
+.progress-row{display:flex;align-items:center;gap:10px;margin-top:12px}
+.progress{flex:1;height:6px;background:#0a100c;border:1px solid var(--line2);position:relative;min-width:80px}
+.progress span{position:absolute;inset:0 auto 0 0;background:var(--green);transition:width .3s}
+.evidence.gone .evi-title,tr.gone td:first-child{text-decoration:line-through;color:var(--muted)}
+tr.gone td{opacity:.6}
+.rep-item.resolved .rep-title{color:var(--muted)}
+.btn.resolve.is-on{background:#102016;color:var(--green);border-color:var(--green)}
+.mini-select{min-height:32px;background:#0a100c;color:var(--text);border:1px solid var(--line2);font:10px var(--mono);padding:0 6px}
+.assistant-log .msg.wait{color:var(--muted);font-style:italic}
+.assistant-consent{padding:10px 14px;border-bottom:1px solid var(--line);font:12px/1.5 var(--sans);color:var(--text)}
+.assistant-consent small{display:block;color:var(--muted);margin-top:4px}

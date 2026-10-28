@@ -57,7 +57,7 @@ function verifiedHow(v) {
 }
 
 /* ---------- state ---------- */
-const S = {cfg: null, audit: null, list: [], view: 'start', pendingCode: new Set(), domainRec: {}, findFilter: 'all', logFilter: {mini: 'ALL', full: 'ALL'}, pollTimer: null, ctx: null};
+const S = {cfg: null, audit: null, list: [], view: 'start', pendingCode: new Set(), findFilter: 'all', logFilter: {mini: 'ALL', full: 'ALL'}, pollTimer: null, ctx: null};
 const NEED_AUDIT = new Set(['case', 'identities', 'graph', 'evidence', 'report', 'sources', 'timeline', 'terminal']);
 const TITLES = {
   start: ['SESSION', 'Аудиты', 'Начните аудит своего следа или откройте учебный режим.'],
@@ -102,6 +102,10 @@ function showView(name, {push = true} = {}) {
   openMenu(false);
   if (name === 'graph') setTimeout(() => graph.center(), 40);
 }
+window.addEventListener('hashchange', () => {
+  const name = location.hash.slice(1);
+  if (name && name !== S.view) showView(name, {push: false});
+});
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-view]');
   if (b && !b.closest('.ctx-body')) showView(b.dataset.view);
@@ -122,6 +126,13 @@ async function loadConfig() {
   $('#cfgGh').innerHTML = yes(S.cfg.github_oauth_configured);
   $('#cfgHibp').innerHTML = yes(S.cfg.hibp_configured);
   $('#cfgTtl').textContent = S.cfg.verify_ttl_days + ' ДН.';
+  $('#cfgEnc').innerHTML = {on: '<span style="color:var(--green)">ВКЛ</span>', off: '<span style="color:var(--amber)">ВЫКЛ</span>',
+    unavailable: '<span style="color:var(--amber)">НЕТ ПАКЕТА</span>'}[S.cfg.encryption] || '—';
+  if (S.cfg.encryption === 'unavailable') $('#encHint').textContent = 'pip install cryptography — без него аудиты сохраняются открытым JSON';
+  if (S.cfg.unreadable_files) $('#encHint').textContent += ` · не удалось прочитать файлов: ${S.cfg.unreadable_files} (другой ключ?)`;
+  $('#cfgAi').innerHTML = yes(S.cfg.assistant_configured);
+  $('#cfgOwn').innerHTML = S.cfg.own_profiles_available ? '<span style="color:var(--green)">OK</span>' : '<span style="color:var(--amber)">НУЖЕН MAIGRET</span>';
+  $('#scheduleSel').innerHTML = '<option value="">ВЫКЛ</option>' + S.cfg.schedule_choices.map(h => `<option value="${h}">КАЖДЫЕ ${h} Ч</option>`).join('');
   $('#cbUrl').textContent = location.origin + '/auth/github/callback';
   $('#ttlHint').textContent = 'ПОВТОРНОЕ ПОДТВЕРЖДЕНИЕ ЧЕРЕЗ ' + S.cfg.verify_ttl_days + ' ДН.';
 }
@@ -164,7 +175,7 @@ function render() {
   document.body.classList.toggle('running', !!(a && a.running));
   $('#runBtn').disabled = !a || a.running;
   $('#runBtn').textContent = a && a.running ? '◷ АУДИТ ИДЁТ…' : '▶ ЗАПУСТИТЬ АУДИТ';
-  ['#exportBtn', '#exportBtn2', '#exportBtn3', '#deleteAuditBtn'].forEach(s => { $(s).disabled = !a; });
+  ['#exportBtn', '#exportBtn2', '#exportBtn3', '#exportBtn4', '#deleteAuditBtn'].forEach(s => { $(s).disabled = !a; });
   if (!a) { $('#pillAudit').textContent = 'НЕТ АУДИТА'; $('#crumbId').textContent = '—'; return; }
   const rep = a.report, t = rep.totals;
   $('#pillAudit').textContent = (a.mode === 'demo' ? 'DEMO / ' : 'AUDIT / ') + a.id.slice(4).toUpperCase();
@@ -184,6 +195,9 @@ function render() {
   $('#tabFind').textContent = t.findings;
   $('#saveToggle').checked = a.save;
   $('#saveState').textContent = a.save ? 'DISK' : 'MEMORY';
+  $('#scheduleSel').value = a.schedule_hours ? String(a.schedule_hours) : '';
+  $('#scheduleSel').disabled = a.mode === 'demo';
+  renderAssistantMode();
   renderOverview(); renderIdentities(); renderEvidence(); renderReport(); renderSources(); renderTimeline(); renderLogs();
   graph.render(a.graph);
   if (S.ctx) openCtx(S.ctx.kind, S.ctx.id, true);
@@ -196,9 +210,34 @@ function findingSub(f) {
 }
 function scoreColor(c) { return c >= 0.7 ? 'var(--green2)' : c >= 0.45 ? 'var(--amber)' : 'var(--red)'; }
 function scoreText(c) { return c >= 0.7 ? 'ВЕРОЯТНО ВАШ' : c >= 0.45 ? 'ПРОВЕРЬТЕ ВРУЧНУЮ' : 'ЧАСТО — ЧУЖОЙ'; }
+function resolveButton(item) {
+  if (!item || item.gone || !item.severity) return '';
+  return `<button class="btn small resolve${item.resolved ? ' is-on' : ''}" data-resolve="${esc(item.finding.id)}" data-done="${item.resolved ? '0' : '1'}">${item.resolved ? '✓ ЗАКРЫТО' : '○ ЗАКРЫЛ'}</button>`;
+}
+const CHANGE_TAG = {new: ['НОВОЕ', 'good'], gone: ['ИСЧЕЗЛО', ''], changed: ['ИЗМЕНИЛОСЬ', 'warn']};
+function changeTag(item) {
+  const c = item && (item.gone ? 'gone' : item.change);
+  return c && CHANGE_TAG[c] ? `<span class="tag ${CHANGE_TAG[c][1]}">${CHANGE_TAG[c][0]}</span>` : '';
+}
 function reviewButtons(f) {
   return `<div class="review-actions"><button class="btn small mine${f.status === 'mine' ? ' is-on' : ''}" data-review="${esc(f.id)}" data-v="mine">✓ МОЙ</button>` +
     `<button class="btn small notmine${f.status === 'not_mine' ? ' is-on' : ''}" data-review="${esc(f.id)}" data-v="not_mine">✕ НЕ МОЙ</button></div>`;
+}
+
+function renderOnboarding() {
+  const a = S.audit, t = a.report.totals;
+  const steps = [
+    ['Добавьте свои email, домен или ник — или войдите через GitHub', a.identities.length > 0, 'identities'],
+    ['Подтвердите владение хотя бы одним идентификатором', t.identities_verified > 0, 'identities'],
+    ['Запустите аудит', a.runs.some(r => r.finished_at), null],
+    ['Отметьте «мой / не мой» у найденных аккаунтов', a.runs.length > 0 && t.review === 0, 'evidence'],
+  ];
+  const done = steps.filter(x => x[1]).length;
+  $('#onboarding').hidden = a.mode === 'demo' || done === steps.length;
+  $('#onbCount').textContent = `${done} / ${steps.length}`;
+  const next = steps.findIndex(x => !x[1]);
+  $('#onbSteps').innerHTML = steps.map(([text, ok, view], i) => `<li class="${ok ? 'done' : i === next ? 'next' : ''}"><span>${ok ? '✓' : i + 1}</span>${esc(text)}${
+    i === next ? (view ? ` <button class="btn small" data-view="${view}">ПЕРЕЙТИ →</button>` : ' <button class="btn small primary" data-run-now="1">▶ ЗАПУСТИТЬ</button>') : ''}</li>`).join('');
 }
 
 function renderOverview() {
@@ -207,6 +246,25 @@ function renderOverview() {
   $('#sevLabel').textContent = 'MAX SEVERITY: ' + SEV_LABEL[rep.max_severity];
   $('#summaryChips').innerHTML = Object.entries(rep.counts.confirmed).sort((x, y) => y[1] - x[1])
     .map(([w, n]) => `<span class="tag ${['password', 'breach', 'phone'].includes(w) ? 'bad' : ['real_name', 'city', 'email'].includes(w) ? 'warn' : ''}">${esc(WHAT[w] || w)} × ${n}</span>`).join('');
+  renderOnboarding();
+  const t = rep.totals;
+  $('#progressRow').hidden = !t.actionable;
+  if (t.actionable) {
+    $('#progressBar').style.width = Math.round(100 * t.resolved / t.actionable) + '%';
+    $('#progressText').textContent = `закрыто вами: ${t.resolved} из ${t.actionable}`;
+  }
+  const d = rep.diff, byId = Object.fromEntries(rep.items.map(i => [i.finding.id, i]));
+  $('#diffPanel').hidden = !d;
+  if (d) {
+    $('#diffMeta').textContent = `ЗАПУСК #${d.run} · ${fmtDate(d.at)}`;
+    const rows = [...d.new.map(id => ['new', id]), ...d.gone.map(id => ['gone', id]), ...d.changed.map(id => ['changed', id])]
+      .filter(([, id]) => byId[id]);
+    $('#diffList').innerHTML = rows.length ? rows.map(([k, id]) => {
+      const f = byId[id].finding;
+      return `<div class="evidence${k === 'gone' ? ' gone' : ''}" data-ctx="finding" data-id="${esc(id)}"><div class="evi-icon">${{new: '+', gone: '−', changed: '~'}[k]}</div>
+        <div><div class="evi-title">${esc(f.value)}</div><div class="evi-source">${esc(FTYPE[f.type] || f.type)} · ${esc(f.source)} ${changeTag(byId[id])}${byId[id].resolved && k === 'gone' ? ' <span class="tag good">ВЫ ЗАКРЫЛИ — ПОДТВЕРЖДЕНО</span>' : ''}</div></div></div>`;
+    }).join('') : '<div class="empty-mini">С прошлого аудита ничего не изменилось</div>';
+  }
   $('#conflictBox').innerHTML = rep.conflicts.map(c => `<div class="conflict-box">▲ Разные значения поля «город» в источниках — оба показаны, без схлопывания: ${c.values.map(v => `<b>${esc(v.value)}</b> (${esc(v.source)})`).join(', ')}</div>`).join('');
 
   const pending = a.findings.filter(f => f.status === 'review' || (f.type === 'profile_url' && f.status !== 'confirmed'))
@@ -220,13 +278,14 @@ function renderOverview() {
       <div class="score" style="color:${scoreColor(f.confidence)}">${f.confidence.toFixed(2)}<small>${scoreText(f.confidence)}</small></div>
     </div>`).join('') + (pending.length > 6 ? `<div class="hint" style="padding-top:10px">…и ещё ${pending.length - 6} — во вкладке «Находки»</div>` : '') : `<div class="empty-mini">${a.findings.length ? 'Все находки проверены' : 'Пока нечего проверять — запустите аудит'}</div>`;
 
-  const top = rep.items.filter(i => i.severity > 0).slice(0, 6);
+  const top = rep.items.filter(i => i.severity > 0).sort((x, y) => x.resolved - y.resolved).slice(0, 6);
   $('#topList').innerHTML = top.length ? top.map(i => `
     <div class="evidence" data-ctx="finding" data-id="${esc(i.finding.id)}"><div class="evi-icon"><span class="sev s${i.severity}">${i.severity}</span></div>
-      <div><div class="evi-title">${esc(i.finding.value)}</div><div class="evi-source">${i.exposures.map(e => esc(WHAT[e.what] || e.what)).join(' · ')} — ${esc((i.recommendations[0] || '').slice(0, 110))}</div></div>
+      <div><div class="evi-title">${esc(i.finding.value)} ${i.resolved ? '<span class="tag good">ЗАКРЫТО</span>' : ''}</div><div class="evi-source">${i.exposures.map(e => esc(WHAT[e.what] || e.what)).join(' · ')} — ${esc((i.recommendations[i.resolved ? 1 : 0] || '').slice(0, 110))}</div></div>
       <div class="evi-date">${fmtTime(i.finding.found_at)}</div></div>`).join('') : '<div class="empty-mini">Раскрытий пока нет</div>';
 
   $('#queueState').textContent = a.running ? 'RUNNING' : 'IDLE';
+
   $('#queueList').innerHTML = a.modules.map(m => queueRow(m)).join('');
 }
 function srcState(m) {
@@ -272,7 +331,7 @@ function identRow(i, depth, byId, demo) {
         : `<button class="btn small" data-act="email-start" data-id="${esc(i.id)}">✉ ОТПРАВИТЬ КОД</button>`;
     } else if (i.type === 'domain') {
       actions = `<button class="btn small" data-act="domain-token" data-id="${esc(i.id)}">ПОЛУЧИТЬ TXT-ЗАПИСЬ</button>` +
-        (S.domainRec[i.id] ? `<button class="btn primary small" data-act="domain-check" data-id="${esc(i.id)}">ПРОВЕРИТЬ DNS</button>` : '');
+        (i.verify_token ? `<button class="btn primary small" data-act="domain-check" data-id="${esc(i.id)}">ПРОВЕРИТЬ DNS</button>` : '');
     } else if (i.type === 'username') {
       actions = `<button class="btn small" data-act="username-check" data-id="${esc(i.id)}">ПРОВЕРИТЬ ССЫЛКУ С ДОМЕНА</button>`;
     } else if (i.type === 'github') {
@@ -281,8 +340,8 @@ function identRow(i, depth, byId, demo) {
   }
   const del = `<button class="btn small danger" data-act="delete" data-id="${esc(i.id)}" title="Удалить вместе с унаследованными">✕</button>`;
   let box = '';
-  if (!demo && i.state !== 'verified' && i.type === 'domain' && S.domainRec[i.id]) {
-    box = `<div class="verify-box">Добавьте в DNS домена <b>${esc(i.value)}</b> TXT-запись:<br><code>${esc(S.domainRec[i.id])}</code><br>и нажмите «Проверить DNS». Обновление DNS может занять несколько минут.</div>`;
+  if (!demo && i.state !== 'verified' && i.type === 'domain' && i.verify_token) {
+    box = `<div class="verify-box">Добавьте в DNS домена <b>${esc(i.value)}</b> TXT-запись:<br><code>${esc(S.cfg.txt_prefix + i.verify_token)}</code><br>и нажмите «Проверить DNS». Обновление DNS может занять несколько минут.</div>`;
   } else if (!demo && i.state !== 'verified' && i.type === 'username') {
     box = `<div class="verify-box">Ник подтверждается двумя способами: войдите через GitHub (ваш логин станет подтверждённым ником) или положите на подтверждённый домен файл <code>https://ваш-домен${esc(S.cfg.well_known_path)}</code> со строкой <code>${esc(i.value)}</code>.</div>`;
   }
@@ -299,11 +358,14 @@ function renderEvidence() {
   const a = S.audit, f = S.findFilter;
   const exposed = new Set(a.report.items.filter(i => i.exposures.length).map(i => i.finding.id));
   const expMap = Object.fromEntries(a.report.items.map(i => [i.finding.id, i.exposures]));
-  const rows = a.findings.filter(x => f === 'all' || (f === 'exposed' ? exposed.has(x.id) : x.status === f))
+  const item = Object.fromEntries(a.report.items.map(i => [i.finding.id, i]));
+  const match = x => f === 'all' ? !x.gone_at : f === 'exposed' ? exposed.has(x.id) : f === 'gone' ? !!x.gone_at
+    : f === 'changes' ? !!(item[x.id] && (item[x.id].change || item[x.id].gone)) : x.status === f && !x.gone_at;
+  const rows = a.findings.filter(match)
     .sort((x, y) => (y.found_at || '').localeCompare(x.found_at || ''));
   $('#findCount').textContent = rows.length + ' / ' + a.findings.length;
   $('#findTable').innerHTML = rows.length ? rows.map(x => `
-    <tr data-ctx="finding" data-id="${esc(x.id)}"><td>${x.url ? link(x.url, x.value) : esc(x.value)}</td><td>${esc(FTYPE[x.type] || x.type)}</td><td>${esc(x.source)}</td>
+    <tr data-ctx="finding" data-id="${esc(x.id)}" class="${x.gone_at ? 'gone' : ''}"><td>${x.url ? link(x.url, x.value) : esc(x.value)} ${changeTag(item[x.id])}${item[x.id] && item[x.id].resolved ? '<span class="tag good">ЗАКРЫТО</span>' : ''}</td><td>${esc(FTYPE[x.type] || x.type)}</td><td>${esc(x.source)}</td>
       <td>${(expMap[x.id] || []).map(e => esc(WHAT[e.what] || e.what)).join(', ') || '—'}</td><td style="color:${scoreColor(x.confidence)}">${x.confidence.toFixed(2)}</td>
       <td><span class="tag ${STATUS[x.status][1]}">${STATUS[x.status][0]}</span></td><td>${fmtDate(x.found_at)}</td></tr>`).join('')
     : '<tr><td colspan="7" style="text-align:center;color:var(--muted)">Нет находок</td></tr>';
@@ -314,13 +376,15 @@ function renderReport() {
   $('#reportSummary').textContent = rep.summary;
   $('#reportItems').innerHTML = rep.items.length ? rep.items.map(i => {
     const f = i.finding;
-    return `<div class="rep-item s${i.severity}${f.status === 'not_mine' ? ' muted' : ''}">
+    if (i.gone && !i.change) return '';
+    return `<div class="rep-item s${i.severity}${f.status === 'not_mine' || i.gone ? ' muted' : ''}${i.resolved ? ' resolved' : ''}">
       <div class="rep-head"><div><div class="rep-title">${f.url ? link(f.url, f.value) : esc(f.value)}</div>
-        <div class="rep-meta">${esc(FTYPE[f.type] || f.type)} · ${esc(f.source)} · confidence ${f.confidence.toFixed(2)} · ${fmtDate(f.found_at)}</div></div>
+        <div class="rep-meta">${esc(FTYPE[f.type] || f.type)} · ${esc(f.source)} · confidence ${f.confidence.toFixed(2)} · ${fmtDate(f.found_at)}</div>
+        <div class="candidate-tags">${changeTag(i)}</div></div>
         <span class="sev s${i.severity}">${SEV_LABEL[i.severity]}</span></div>
       ${i.exposures.length ? `<div class="exp-list">${i.exposures.map(e => `<b>${esc(WHAT[e.what] || e.what)}</b>: ${esc(e.detail)}`).join('<br>')}</div>` : ''}
       ${i.recommendations.length ? `<ul class="rep-recs">${i.recommendations.map(r => `<li>${esc(r)}</li>`).join('')}</ul>` : ''}
-      ${f.type === 'profile_url' || f.status === 'mine' || f.status === 'not_mine' ? reviewButtons(f) : ''}</div>`;
+      <div class="review-actions">${resolveButton(i)}${f.type === 'profile_url' || f.status === 'mine' || f.status === 'not_mine' ? reviewButtons(f).replace(/^<div class="review-actions">|<\/div>$/g, '') : ''}</div></div>`;
   }).join('') : '<div class="empty-mini" style="margin-top:12px">Отчёт появится после аудита</div>';
 }
 
@@ -391,6 +455,16 @@ async function review(fid, verdict) {
   if (a) setAudit(a);
 }
 document.addEventListener('click', async e => {
+  const rs = e.target.closest('[data-resolve]');
+  if (rs) {
+    e.stopPropagation();
+    const done = rs.dataset.done === '1';
+    const a = await act(() => api('POST', `/api/audits/${S.audit.id}/findings/${rs.dataset.resolve}/resolve`, {done}),
+      done ? 'Отмечено как закрытое — повторный аудит проверит' : 'Снова открыто');
+    if (a) setAudit(a);
+    return;
+  }
+  if (e.target.closest('[data-run-now]')) { runAudit(); return; }
   const rv = e.target.closest('[data-review]');
   if (rv) { e.stopPropagation(); review(rv.dataset.review, rv.dataset.v); return; }
   const ctx = e.target.closest('[data-ctx]');
@@ -412,12 +486,12 @@ document.addEventListener('click', async e => {
     }
     case 'domain-token': {
       const r = await act(() => api('POST', base + '/domain/token'));
-      if (r) { S.domainRec[id] = r.record; renderIdentities(); }
+      if (r) refresh();
       break;
     }
     case 'domain-check': {
       const a = await act(() => api('POST', base + '/domain/check'), 'Домен подтверждён');
-      if (a) { delete S.domainRec[id]; setAudit(a); }
+      if (a) setAudit(a);
       break;
     }
     case 'username-check': {
@@ -427,7 +501,7 @@ document.addEventListener('click', async e => {
     }
     case 'github': githubLogin(); break;
     case 'delete': {
-      if (!confirm('Удалить идентификатор, всё, что от него унаследовано, и связанные находки?')) return;
+      if (!confirm('Удалить идентификатор, всё, что от него унаследовано, и связанные находки? Унаследованный идентификатор не вернётся при следующем аудите.')) return;
       const a = await act(() => api('DELETE', base), 'Удалено');
       if (a) setAudit(a);
       break;
@@ -467,12 +541,19 @@ async function runAudit(module) {
 }
 $('#runBtn').addEventListener('click', () => runAudit());
 $('#newRealBtn').addEventListener('click', () => newAudit('real'));
-const doExport = () => {
+const doExport = fmt => {
   if (!S.audit) return;
-  if (window.HS_EXPORT) { window.HS_EXPORT(S.audit); return; }  // онлайн-демо без сервера
-  location.href = `/api/audits/${S.audit.id}/export`;
+  if (window.HS_EXPORT) { window.HS_EXPORT(S.audit, fmt); return; }  // онлайн-демо без сервера
+  location.href = `/api/audits/${S.audit.id}/export${fmt === 'html' ? '.html' : ''}`;
 };
-['#exportBtn', '#exportBtn2', '#exportBtn3'].forEach(s => $(s).addEventListener('click', doExport));
+['#exportBtn', '#exportBtn2', '#exportBtn4'].forEach(s => $(s).addEventListener('click', () => doExport('html')));
+$('#exportBtn3').addEventListener('click', () => doExport('json'));
+$('#scheduleSel').addEventListener('change', async e => {
+  if (!S.audit) return;
+  const hours = e.target.value ? Number(e.target.value) : null;
+  const a = await act(() => api('PUT', `/api/audits/${S.audit.id}/schedule`, {hours}), hours ? `Повторный аудит каждые ${hours} ч` : 'Расписание выключено');
+  if (a) setAudit(a); else e.target.value = S.audit.schedule_hours ? String(S.audit.schedule_hours) : '';
+});
 $('#saveToggle').addEventListener('change', async e => {
   if (!S.audit) return;
   const a = await act(() => api('PUT', `/api/audits/${S.audit.id}/save`, {save: e.target.checked}), e.target.checked ? 'Аудит сохраняется на диск' : 'Файл аудита удалён, данные только в памяти');
@@ -506,7 +587,10 @@ function openCtx(kind, id, silent) {
     });
     if (item.exposures.length) h += `<div class="section-title" style="margin-top:14px">ЧТО РАСКРЫТО</div><div class="exp-list">${item.exposures.map(e => `<b>${esc(WHAT[e.what] || e.what)}</b>: ${esc(e.detail)}`).join('<br>')}</div>`;
     if (item.recommendations.length) h += `<div class="section-title" style="margin-top:14px">ЧТО СДЕЛАТЬ</div><ul class="rep-recs">${item.recommendations.map(r => `<li>${esc(r)}</li>`).join('')}</ul>`;
+    if (item.gone) h += `<div class="conflict-box">Не найдено при последней проверке источника${item.resolved ? ' — вы закрыли это, и аудит подтвердил' : ''}.</div>`;
+    if (resolveButton(item)) h += `<div class="section-title" style="margin-top:14px">ЧЕК-ЛИСТ</div><div class="review-actions">${resolveButton(item)}</div>`;
     h += `<div class="section-title" style="margin-top:14px">ВАШ ЛИ ЭТО АККАУНТ?</div>${reviewButtons(f)}`;
+    if (f.type === 'profile_url') h += `<div class="hint">После «мой» сайт прочитает только эту страницу и проверит, видно ли на ней ваше имя и город.</div>`;
     h += `<div class="ctx-actions"><button class="btn" data-retry="${esc(f.source)}" ${a.running ? 'disabled' : ''}>↻ ПРОВЕРИТЬ ИСТОЧНИК ЕЩЁ РАЗ</button><button class="btn small" data-goto="graph">В ГРАФ</button></div>`;
   } else if (kind === 'identity') {
     const i = a.identities.find(x => x.id === id); if (!i) { closeCtx(); return; }
@@ -657,7 +741,20 @@ $('#normalizeBtn').addEventListener('click', async () => {
 });
 $('#clearNorm').addEventListener('click', () => { $('#normInput').value = ''; const o = $('#normResults'); o.className = 'empty-ascii'; o.textContent = 'Введите значение и запустите нормализацию.'; });
 
-/* ---------- assistant (заготовка по ключевым словам) ---------- */
+/* ---------- assistant: Anthropic API с согласия, иначе заготовки по ключевым словам ---------- */
+function assistantLive() {
+  const a = S.audit;
+  return !!(S.cfg && S.cfg.assistant_configured && a && (a.mode === 'demo' || a.assistant_consent));
+}
+function renderAssistantMode() {
+  const a = S.audit, cfgOk = S.cfg && S.cfg.assistant_configured;
+  $('#assistantMode').textContent = assistantLive() ? 'ANTHROPIC API' : 'ЗАГОТОВКИ';
+  $('#assistantConsentRow').hidden = !cfgOk || !a || a.mode === 'demo';
+  if (a) $('#assistantConsent').checked = !!a.assistant_consent;
+  $('#assistantNote').textContent = cfgOk
+    ? 'Объясняет находки и подсказывает, как закрыть утечку. С вашего согласия отвечает через Anthropic API на основе сводки отчёта.'
+    : 'Объясняет находки и подсказывает, как закрыть утечку. Сейчас — заготовки по ключевым словам; добавьте ANTHROPIC_API_KEY в .env, чтобы подключить Claude.';
+}
 (() => {
   const RULES = [
     {k: ['утечк', 'breach', 'pwned', 'парол'], a: 'Если адрес в утечке с паролем: смените пароль на этом сервисе и везде, где он повторялся, включите 2FA, заведите менеджер паролей. Утечки без паролей — повод ждать фишинга на этот адрес.'},
@@ -671,13 +768,33 @@ $('#clearNorm').addEventListener('click', () => { $('#normInput').value = ''; co
     {k: ['хран', 'удал', 'диск', 'данн'], a: 'Без отметки «сохранить аудит» на диск ничего не пишется. В «Настройках и данных» — полная выгрузка JSON и удаление всего одной кнопкой.'},
     {k: ['привет', 'hello', 'хай'], a: 'Привет. Спроси про утечки, коммиты, ники, подтверждение или хранение данных.'},
   ];
-  const log = $('#assistantLog');
-  function add(text, who) { const d = document.createElement('div'); d.className = 'msg' + (who === 'user' ? ' user' : ''); d.textContent = text; log.appendChild(d); log.scrollTop = log.scrollHeight; }
-  $('#assistantForm').addEventListener('submit', e => {
+  const log = $('#assistantLog'), history = [];
+  function add(text, who) {
+    const d = document.createElement('div'); d.className = 'msg' + (who === 'user' ? ' user' : who === 'wait' ? ' wait' : '');
+    d.textContent = text; log.appendChild(d); log.scrollTop = log.scrollHeight; return d;
+  }
+  const rules = text => {
+    const low = text.toLowerCase(), hit = RULES.find(r => r.k.some(k => low.includes(k)));
+    return hit ? hit.a : 'Отвечаю по заготовленным правилам. Спроси про утечки, коммиты, ник, confidence, подтверждение или хранение.';
+  };
+  $('#assistantForm').addEventListener('submit', async e => {
     e.preventDefault(); const inp = $('#assistantInput'), text = inp.value.trim(); if (!text) return;
     add(text, 'user'); inp.value = '';
-    const low = text.toLowerCase(), hit = RULES.find(r => r.k.some(k => low.includes(k)));
-    setTimeout(() => add(hit ? hit.a : 'Пока отвечаю по заготовленным правилам. Спроси про утечки, коммиты, ник, confidence, подтверждение или хранение.'), 200);
+    if (!assistantLive()) { setTimeout(() => add(rules(text)), 200); return; }
+    const wait = add('думаю…', 'wait');
+    try {
+      const r = await api('POST', `/api/audits/${S.audit.id}/assistant`, {message: text, history: history.slice(-12)});
+      wait.remove(); add(r.answer);
+      history.push({role: 'user', content: text}, {role: 'assistant', content: r.answer});
+    } catch (err) {
+      wait.remove(); add('✕ ' + err.message + '\n\nПо заготовкам: ' + rules(text));
+    }
+  });
+  $('#assistantConsent').addEventListener('change', async ev => {
+    if (!S.audit) return;
+    const a = await act(() => api('PUT', `/api/audits/${S.audit.id}/assistant-consent`, {consent: ev.target.checked}),
+      ev.target.checked ? 'Ассистент будет отвечать через Anthropic API' : 'Согласие отозвано — только заготовки');
+    if (a) setAudit(a);
   });
   add('На связи. Спроси, что делать с находкой: утечка, email в коммитах, занятый ник, забытый аккаунт.');
 })();

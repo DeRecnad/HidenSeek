@@ -2,3 +2,7 @@ fastapi>=0.110
 uvicorn>=0.29
 httpx>=0.27
 pydantic>=2.6
+typer>=0.12
+rich>=13
+cryptography>=42   # шифрование сохранённых аудитов (без него — открытый JSON)
+anthropic>=2.0     # ИИ-ассистент (нужен ANTHROPIC_API_KEY; без ключа — заготовки)

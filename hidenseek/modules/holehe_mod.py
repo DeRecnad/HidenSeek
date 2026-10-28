@@ -1,10 +1,13 @@
 """Holehe: на каких сервисах зарегистрирована ваша почта (забытые аккаунты)."""
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 
 from ..config import Settings
 from .base import Fact, Module, ModuleError, ModuleResult, RawFinding, RunContext
+
+CONCURRENCY = 10  # параллельно, но без залпа по всем ~120 сервисам сразу
 
 
 class HoleheModule(Module):
@@ -35,12 +38,17 @@ class HoleheModule(Module):
         # nopasswordrecovery: не трогаем модули, которые идут через «забыли пароль» (шлют письма)
         websites = get_functions(modules, SimpleNamespace(nopasswordrecovery=True))
         out: list[dict] = []
-        async with httpx.AsyncClient(timeout=10) as client:
-            for site in websites:
+        sem = asyncio.Semaphore(CONCURRENCY)
+
+        async def check(site) -> None:
+            async with sem:
                 try:
                     await site(fact.value, client, out)
                 except Exception:  # noqa: BLE001 — сбой одного сервиса не роняет модуль
-                    continue
+                    pass
+
+        async with httpx.AsyncClient(timeout=10) as client:
+            await asyncio.gather(*(check(site) for site in websites))
         res = ModuleResult()
         limited = 0
         for item in out:

@@ -63,23 +63,36 @@ def build(audit: Audit, settings: Settings) -> dict:
 
     confirmed_places: Counter = Counter()
     review_places: Counter = Counter()
+    last = latest_diff(audit)
+    change_of = {}
+    if last:
+        for kind in ("new", "gone", "changed"):
+            for fid in last[kind]:
+                change_of[fid] = kind
     items = []
     for f in audit.findings:
         exps = by_finding.get(f.id, [])
         whats = {e.what for e in exps}
-        counter = review_places if f.status == "review" else confirmed_places
-        if f.status != "not_mine":
+        if f.active:
+            counter = review_places if f.status == "review" else confirmed_places
             for w in whats:
                 counter[w] += 1
-        severity = max((e.severity for e in exps), default=0)
+        severity = max((e.severity for e in exps), default=0) if f.active else 0
+        recs = recommendations(f, whats) if f.active else []
+        if f.resolved_at and f.active:
+            recs.insert(0, "Вы отметили это как закрытое. Следующий аудит покажет, исчезло ли оно на самом деле.")
         items.append({
             "finding": f.model_dump(mode="json"),
             "exposures": [e.model_dump(mode="json") for e in exps],
-            "severity": severity if f.status != "not_mine" else 0,
-            "severity_label": SEVERITY_LABEL[severity if f.status != "not_mine" else 0],
-            "recommendations": recommendations(f, whats) if f.status != "not_mine" else [],
+            "severity": severity,
+            "severity_label": SEVERITY_LABEL[severity],
+            "recommendations": recs,
+            "change": change_of.get(f.id),
+            "gone": f.gone_at is not None,
+            "resolved": f.resolved_at is not None,
         })
-    items.sort(key=lambda i: (-i["severity"], i["finding"]["status"] != "review", i["finding"]["source"]))
+    items.sort(key=lambda i: (i["gone"], -i["severity"], i["resolved"], i["finding"]["status"] != "review",
+                              i["finding"]["source"]))
 
     parts = []
     for what in ("password", "breach", "real_name", "city", "email", "phone", "account", "username", "subdomain"):
@@ -87,22 +100,48 @@ def build(audit: Audit, settings: Settings) -> dict:
         if n:
             parts.append(f"{WHAT_LABEL[what]} — в {n}")
     summary = ("Видно: " + "; ".join(parts) + ".") if parts else "Подтверждённых раскрытий пока нет."
-    pending = sum(1 for f in audit.findings if f.status == "review")
+    pending = sum(1 for f in audit.findings if f.status == "review" and f.active)
     if pending:
         summary += f" Ещё {pending} находок ждут проверки «мой / не мой»."
+    actionable = [i for i in items if i["severity"] > 0]
+    resolved = sum(1 for i in actionable if i["resolved"])
+    if resolved:
+        summary += f" Закрыто вами: {resolved} из {len(actionable)}."
+    if last:
+        summary += (f" С прошлого аудита: новых {len(last['new'])}, исчезло {len(last['gone'])}, "
+                    f"изменилось {len(last['changed'])}.")
 
     return {
         "audit_id": audit.id,
         "summary": summary,
         "counts": {"confirmed": dict(confirmed_places), "review": dict(review_places)},
         "totals": {
-            "findings": len(audit.findings),
-            "exposures": len([e for e in audit.exposures]),
+            "findings": sum(1 for f in audit.findings if f.gone_at is None),
+            "all_findings": len(audit.findings),
+            "gone": sum(1 for f in audit.findings if f.gone_at is not None),
+            "exposures": len(audit.exposures),
             "review": pending,
+            "actionable": len(actionable),
+            "resolved": resolved,
             "identities_verified": sum(1 for i in audit.identities if audit.is_verified(i, ttl)),
             "identities": len(audit.identities),
+            "runs": len(audit.runs),
         },
         "max_severity": max((i["severity"] for i in items), default=0),
         "conflicts": city_conflicts(audit),
+        "diff": last,
         "items": items,
     }
+
+
+def latest_diff(audit: Audit) -> dict | None:
+    """Изменения последнего завершённого запуска относительно предыдущего."""
+    done = [r for r in audit.runs if r.finished_at and r.n > 1]
+    if not done:
+        return None
+    r = done[-1]
+    out: dict = {"run": r.n, "at": r.finished_at.isoformat(), "new": [], "gone": [], "changed": []}
+    for h in audit.history:
+        if h.run == r.n and h.finding_id not in out[h.change]:
+            out[h.change].append(h.finding_id)
+    return out

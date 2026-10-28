@@ -121,11 +121,11 @@ def city_conflicts(audit: Audit) -> list[dict]:
     """«В 3 источниках один город, в 1 — другой» → оба значения с источником, без схлопывания."""
     seen: dict[str, list[dict]] = {}
     for f in audit.findings:
-        if f.status == "not_mine":
+        if not f.active:
             continue
         loc = _profile_fields(f).get("location")
         if loc:
-            seen.setdefault(latin_key(loc), []).append({"value": loc, "source": f.source, "finding_id": f.id})
+            seen.setdefault(latin_key(loc.split(",")[0]), []).append({"value": loc, "source": f.source, "finding_id": f.id})
     if len(seen) < 2:
         return []
     return [{"field": "city", "values": [v for vals in seen.values() for v in vals]}]
@@ -134,6 +134,6 @@ def city_conflicts(audit: Audit) -> list[dict]:
 def apply(audit: Audit, settings: Settings | None = None) -> None:
     audit.exposures = []
     for f in audit.findings:
-        if f.status == "not_mine":
-            continue  # вы отметили «не мой» — не считаем это раскрытием
+        if not f.active:
+            continue  # «не мой» или исчезла при последней проверке — не считаем раскрытием
         audit.exposures.extend(exposures_for(f, audit))

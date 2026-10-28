@@ -82,7 +82,7 @@ def test_demo_cannot_be_verified(settings):
 def test_save_persist_and_wipe(settings):
     with client(settings) as c:
         a = c.post("/api/audits", json={"mode": "real"}, headers=H).json()
-        path = settings.data_dir / "audits" / f"{a['id']}.json"
+        path = settings.data_dir / "audits" / f"{a['id']}.json.enc"  # шифрование включено по умолчанию
         assert not path.exists()
         c.put(f"/api/audits/{a['id']}/save", json={"save": True}, headers=H)
         assert path.exists()
@@ -97,4 +97,4 @@ def test_export_is_json(settings):
     with client(settings) as c:
         a = c.post("/api/audits", json={"mode": "demo", "persona": "boris"}, headers=H).json()
         r = c.get(f"/api/audits/{a['id']}/export")
-        assert r.status_code == 200 and r.json()["audit"]["schema_version"] == 1
+        assert r.status_code == 200 and r.json()["audit"]["schema_version"] == 2

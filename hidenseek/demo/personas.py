@@ -87,6 +87,25 @@ DATA: dict[tuple[str, str], ModuleResult] = {
 # Один источник «падает» на первой попытке — чтобы показать retry.
 FLAKY_ONCE = {("crtsh", "alice-testova.example")}
 
+# Повторный запуск возвращает немного другое — чтобы показать сравнение аудитов (diff):
+# старый аккаунт удалён (исчез), появился новый сервис, один сайт с ником закрылся.
+RERUN: dict[tuple[str, str], ModuleResult] = {
+    ("holehe", "alice.testova@example.com"): ModuleResult(findings=[
+        RawFinding("registered_service", s, f"https://{s}", 0.95, data={"service": s.split(".")[0]})
+        for s in ("music-stream.example", "blogs.example", "fitness.example", "newsletter.example")
+    ]),
+    ("maigret", "persik"): ModuleResult(findings=[
+        f for f in DATA[("maigret", "persik")].findings if not f.value.startswith("Dating-demo")
+    ]),
+}
+
+# Что видно на страницах, если вы отметите аккаунт «мой» (разбор только ваших страниц).
+OWN_PAGES = {
+    f"https://demodev.example/{_GH}": {"name": "Alice Testova", "location": "Novosibirsk", "bio": "Python, котики"},
+    f"https://habr.example/{_GH}": {"name": "Алиса Т.", "bio": "Пишу про бэкенд"},
+    "https://photos.example/persik": {"location": "Москва"},
+}
+
 
 class MockModule(Module):
     def __init__(self, real: Module, delay: float = 0.35):
@@ -95,6 +114,7 @@ class MockModule(Module):
         self.outputs, self.description, self.warning = real.outputs, real.description, ""
         self.delay = delay
         self._failed: set[tuple[str, str]] = set()
+        self._calls: dict[tuple[str, str], int] = {}
 
     def available(self, settings) -> tuple[bool, str]:
         return True, ""
@@ -105,10 +125,17 @@ class MockModule(Module):
         if key in FLAKY_ONCE and key not in self._failed:
             self._failed.add(key)
             raise ModuleError("HTTP 503: источник временно недоступен (демо-сбой)")
-        res = DATA.get(key)
+        n = self._calls[(fact.identity_id, fact.value)] = self._calls.get((fact.identity_id, fact.value), 0) + 1
+        res = RERUN.get(key) if n > 1 and key in RERUN else DATA.get(key)
         if res is None:
             return ModuleResult(note="ничего не найдено (демо)")
         return ModuleResult(findings=list(res.findings), new_facts=list(res.new_facts), note=res.note)
+
+
+def demo_enricher():
+    from ..modules.own_profile import DemoEnricher
+
+    return DemoEnricher(OWN_PAGES)
 
 
 def mock_registry(real: dict[str, Module], delay: float = 0.35) -> dict[str, Module]:

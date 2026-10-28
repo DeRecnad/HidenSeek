@@ -40,6 +40,9 @@ def add_identity(audit: Audit, type_: str, value: str) -> Identity:
         raise IngestError("GitHub-аккаунт добавляется только через вход на GitHub (OAuth)")
     if any(i.type == t and i.value.lower() == v.lower() for i in audit.identities):
         raise IngestError("Такой идентификатор уже есть")
+    key = Audit.suppress_key(t.value, v)
+    if key in audit.suppressed:
+        audit.suppressed.remove(key)  # добавили вручную — больше не скрываем
     ident = Identity(type=t, value=v)
     audit.identities.append(ident)
     return ident
@@ -55,6 +58,10 @@ def remove_identity(audit: Audit, identity_id: str) -> None:
             if i.parent_id in doomed and i.id not in doomed:
                 doomed.add(i.id)
                 changed = True
+    for i in audit.identities:
+        # унаследованное само вернётся при следующем аудите — запоминаем, что вы его убрали
+        if i.id in doomed and i.parent_id and (key := Audit.suppress_key(i.type.value, i.value)) not in audit.suppressed:
+            audit.suppressed.append(key)
     audit.identities = [i for i in audit.identities if i.id not in doomed]
     audit.findings = [f for f in audit.findings if f.identity_id not in doomed]
     kept = {f.id for f in audit.findings}

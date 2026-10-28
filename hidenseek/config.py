@@ -46,13 +46,20 @@ class Settings:
     github_token: str = os.environ.get("GITHUB_TOKEN", "")
     hibp_api_key: str = os.environ.get("HIBP_API_KEY", "")
 
+    encrypt: bool = os.environ.get("HIDENSEEK_ENCRYPT", "1") not in ("0", "false", "no")
+    key_file: Path = Path(os.environ.get("HIDENSEEK_KEY_FILE", Path.home() / ".config" / "hidenseek" / "key"))
+    key: str = os.environ.get("HIDENSEEK_KEY", "")
+    anthropic_api_key: str = os.environ.get("ANTHROPIC_API_KEY", "")
+    assistant_model: str = os.environ.get("HIDENSEEK_ASSISTANT_MODEL", "claude-opus-5-5")
+    scheduler_interval: int = _int("SCHEDULER_INTERVAL", 60)
+
     verify_ttl_days: int = _int("VERIFY_TTL_DAYS", 90)
     max_depth: int = _int("AUDIT_MAX_DEPTH", 2)
     max_facts: int = _int("AUDIT_MAX_FACTS", 30)
     module_retries: int = _int("MODULE_RETRIES", 2)
     module_delay: float = float(os.environ.get("MODULE_DELAY", "1.0"))
 
-    user_agent: str = field(default="HidenSeek-self-audit/0.1")
+    user_agent: str = field(default="HidenSeek-self-audit/0.2")
 
     @property
     def smtp_configured(self) -> bool:

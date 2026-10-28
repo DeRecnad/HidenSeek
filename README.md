@@ -29,38 +29,70 @@
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 pip install -r requirements-sources.txt   # Maigret и Holehe (по желанию, они тяжёлые)
-cp .env.example .env                      # заполните SMTP / GitHub OAuth / HIBP по желанию
+cp .env.example .env                      # SMTP / GitHub OAuth / HIBP / Anthropic — по желанию
 python -m hidenseek                       # → http://127.0.0.1:8000
 ```
 
 **Учебный режим** работает сразу, без настроек: синтетические персонажи и мок-источники,
 реальных запросов в сеть нет. В нём видны очередь, retry, наследование подтверждения,
-сверка с профилем, confidence и граф.
+сверка с профилем, confidence, граф, сравнение двух запусков и чек-лист.
+
+## Что умеет
+
+- **Подтверждение владения** — код на почту (с паузой 60 с между письмами), TXT-запись домена
+  (токен хранится в аудите и переживает перезапуск), вход через GitHub, ник через GitHub или домен.
+- **Сравнение аудитов** — каждый повторный запуск сравнивается с прошлым: новое, исчезнувшее,
+  изменившееся. Если источник не ответил, его находки не помечаются исчезнувшими.
+- **Чек-лист** — «✓ закрыл» у каждой рекомендации; следующий аудит подтверждает, что находка исчезла.
+- **Разбор моих страниц** — после отметки «мой» читается только эта страница (socid_extractor из
+  Maigret), чтобы проверить, видно ли на ней имя и город. В очередь ничего не добавляется.
+- **Скрытые идентификаторы** — удалённый вами унаследованный адрес не возвращается сам.
+- **Повторный аудит по расписанию** — каждые 6/12/24/72/168 ч, пока открыт сайт, или через cron.
+- **Шифрование** сохранённых аудитов (Fernet), ключ вне репозитория.
+- **Отчёт в HTML** — один файл, открывается офлайн и печатается.
+- **ИИ-ассистент** — через Anthropic API, только с ключом и вашим согласием; почта и телефоны
+  маскируются перед отправкой. Без ключа — заготовки по ключевым словам.
+
+## CLI
+
+```bash
+python -m hidenseek demo alice --runs 2    # учебный аудит в терминале, со сравнением
+python -m hidenseek list                   # сохранённые аудиты
+python -m hidenseek show <id>              # отчёт
+python -m hidenseek run <id>               # повторный аудит (удобно для cron)
+python -m hidenseek export <id> --format html -o report.html
+python -m hidenseek serve --port 8000      # сайт (то же, что без команды)
+```
 
 ## Что внутри
 
 ```
 hidenseek/
   core/
-    models.py      — Audit / Identity / Finding / Exposure (версия схемы в записи)
-    ingest.py      — приём идентификаторов (неподтверждёнными)
-    verify.py      — email-код, TXT-запись, GitHub OAuth, ник через домен
-    queue.py       — очередь фактов, rate-limit, retry, стоп-условия
-    dispatcher.py  — факт → модули по input_type; сбой модуля не роняет аудит
-    normalizer.py  — транслит, уменьшительные имена, E.164, варианты ника
-    matcher.py     — сверка с профилем «это я» → exposures + severity
-    report.py      — сводка и рекомендации
-    graph.py       — граф: я → мои идентификаторы → где видны
-    storage.py     — хранение (на диск только с отметкой «сохранить аудит»)
-  modules/         — github, crtsh, maigret, holehe, hibp (одинаковый интерфейс)
-  demo/            — учебный режим: персонажи и мок-источники
-  webapp/          — FastAPI + статика Ghost Terminal
-tests/             — 38 тестов на моках, без сети
+    models.py       — Audit / Identity / Finding / Exposure / RunRecord (версия схемы в записи)
+    ingest.py       — приём идентификаторов (неподтверждёнными), скрытые идентификаторы
+    verify.py       — email-код, TXT-запись, GitHub OAuth, ник через домен
+    queue.py        — очередь фактов, rate-limit, retry, стоп-условия
+    dispatcher.py   — факт → модули по input_type; сравнение запусков; разбор моих страниц
+    normalizer.py   — транслит, уменьшительные имена, E.164, варианты ника
+    matcher.py      — сверка с профилем «это я» → exposures + severity
+    report.py       — сводка, рекомендации, чек-лист, diff
+    html_report.py  — отчёт одним HTML-файлом
+    graph.py        — граф: я → мои идентификаторы → где видны
+    storage.py      — хранение (на диск только с отметкой «сохранить аудит»)
+    crypto.py       — шифрование Fernet
+    assistant.py    — ИИ-ассистент (Anthropic API)
+  modules/          — github, crtsh, maigret, holehe, hibp, own_profile
+  demo/             — учебный режим: персонажи и мок-источники
+  webapp/           — FastAPI + Ghost Terminal
+  cli.py            — команды терминала (typer + rich)
+tests/              — pytest на моках + tests/e2e/ui.mjs (Playwright)
+tools/              — сборка онлайн-демо без сервера
 ```
 
-Источники: **GitHub API** (поля профиля и email в ваших коммитах, только коммиты вашего аккаунта),
-**crt.sh** (поддомены), **Maigret** (ник на 500 сайтах, все находки — «мой / не мой?»),
-**Holehe** (без модулей через восстановление пароля), **HaveIBeenPwned** (нужен платный ключ).
+Источники: **GitHub API** (поля профиля и email в ваших коммитах, до 500 коммитов, только коммиты
+вашего аккаунта), **crt.sh** (поддомены), **Maigret** (ник на 500 сайтах, все находки — «мой / не мой?»),
+**Holehe** (параллельно, без модулей через восстановление пароля), **HaveIBeenPwned** (нужен платный ключ).
 
 Severity: пароль в утечке (4) > телефон / утечка / имя + город (3) > имя, город, почта (2) > занятый ник, аккаунт, поддомен (1).
 
@@ -75,13 +107,14 @@ Severity: пароль в утечке (4) > телефон / утечка / и�
 
 ```bash
 pip install -r requirements-dev.txt
-pytest
+pytest                                                   # модульные и API-тесты, без сети
+python tools/build_static_demo.py build/hidenseek-demo.html
+MODULE_DELAY=0 python -m hidenseek serve --port 8765 &
+npm install --no-save playwright && npx playwright install chromium
+node tests/e2e/ui.mjs http://127.0.0.1:8765 build/hidenseek-demo.html
 ```
 
-## Дальше по роадмапу
-
-CLI (typer + rich), diff между аудитами, шифрование базы (Fernet), экспорт отчёта в HTML,
-desktop-обёртка (pywebview), ИИ-ассистент через Anthropic API, theHarvester.
+CI (`.github/workflows/ci.yml`) запускает всё это на каждый push.
 
 ## Онлайн-демо без сервера
 
@@ -89,6 +122,11 @@ desktop-обёртка (pywebview), ИИ-ассистент через Anthropic
 python tools/build_static_demo.py build/hidenseek-demo.html
 ```
 
-Собирает одну HTML-страницу с учебным режимом: аудиты демо-персонажей считаются настоящим
-кодом проекта и вшиваются в страницу, а `tools/static_demo_shim.js` подменяет API в браузере.
-Страницу можно открыть с телефона или выложить на GitHub Pages. Реального поиска в ней нет.
+Собирает одну HTML-страницу с учебным режимом: аудиты демо-персонажей (два запуска) считаются
+настоящим кодом проекта и вшиваются в страницу, а `tools/static_demo_shim.js` подменяет API в браузере.
+`.github/workflows/pages.yml` выкладывает её на GitHub Pages при push в main — один раз включите
+Settings → Pages → Source: GitHub Actions. Реального поиска в демо нет.
+
+## Дальше
+
+Desktop-обёртка (pywebview + PyInstaller), theHarvester, английский интерфейс.

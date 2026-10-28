@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+from contextlib import asynccontextmanager
+from datetime import timedelta
 from pathlib import Path
 from typing import Optional
 from urllib.parse import quote_plus
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -17,16 +19,20 @@ from .. import __version__
 from ..config import Settings, settings as default_settings
 from ..core import graph as graph_mod
 from ..core import report as report_mod
-from ..core import matcher
-from ..core.dispatcher import run_audit
+from ..core import assistant as assistant_mod
+from ..core import crypto, html_report, matcher
+from ..core.dispatcher import enrich_own_profiles, run_audit
 from ..core.ingest import IngestError, add_identity, remove_identity, set_profile
-from ..core.models import Audit
+from ..core.models import Audit, utcnow
 from ..core.normalizer import phone_e164, translit, username_variants
 from ..core.storage import AuditStore, export_json
 from ..core.verify import TXT_PREFIX, WELL_KNOWN_PATH, VerificationError, Verifier, apply_github_login
-from ..demo.personas import PERSONAS, build_demo_audit, mock_registry
+from ..demo.personas import PERSONAS, build_demo_audit, demo_enricher, mock_registry
 from ..modules import real_registry
 from ..modules.base import Module
+from ..modules.own_profile import ProfileEnricher, eligible
+
+SCHEDULE_CHOICES = (6, 12, 24, 72, 168)
 
 STATIC = Path(__file__).parent / "static"
 
@@ -71,6 +77,28 @@ class NormalizeIn(BaseModel):
     value: str
 
 
+class ResolveIn(BaseModel):
+    done: bool
+
+
+class ScheduleIn(BaseModel):
+    hours: Optional[int] = None
+
+
+class ConsentIn(BaseModel):
+    consent: bool
+
+
+class ChatTurn(BaseModel):
+    role: str
+    content: str
+
+
+class AssistantIn(BaseModel):
+    message: str
+    history: list[ChatTurn] = []
+
+
 def audit_view(a: Audit, settings: Settings, registry: dict[str, Module]) -> dict:
     """Всё, что нужно интерфейсу об одном аудите: идентификаторы, находки, модули, отчёт, граф."""
     ttl = settings.verify_ttl_days
@@ -99,8 +127,19 @@ def audit_view(a: Audit, settings: Settings, registry: dict[str, Module]) -> dic
     return data
 
 
-def config_view(settings: Settings) -> dict:
+def config_view(settings: Settings, store: Optional[AuditStore] = None) -> dict:
+    if store is not None and store.encrypted:
+        encryption = "on"
+    elif settings.encrypt and not crypto.available():
+        encryption = "unavailable"
+    else:
+        encryption = "off"
     return {
+        "encryption": encryption,
+        "unreadable_files": len(store.unreadable) if store is not None else 0,
+        "assistant_configured": assistant_mod.configured(settings),
+        "own_profiles_available": ProfileEnricher().available()[0],
+        "schedule_choices": list(SCHEDULE_CHOICES),
         "version": __version__,
         "smtp_configured": settings.smtp_configured,
         "github_oauth_configured": settings.github_oauth_configured,
@@ -121,12 +160,23 @@ def create_app(
 ) -> FastAPI:
     app = FastAPI(title="HidenSeek", version=__version__, docs_url="/api/docs", redoc_url=None)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(allowed_hosts))
-    store = AuditStore(settings.data_dir)
+    store = AuditStore(settings.data_dir, crypto.make_cipher(settings.encrypt, settings.key_file, settings.key))
     verifier = verifier or Verifier(settings)
     real = registry or real_registry()
     demo = mock_registry(real, demo_delay)
+    real_enricher, demo_enr = ProfileEnricher(), demo_enricher()
     tasks: dict[str, asyncio.Task] = {}
     app.state.store, app.state.verifier, app.state.tasks = store, verifier, tasks
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        loop = asyncio.create_task(scheduler_loop())
+        try:
+            yield
+        finally:
+            loop.cancel()
+
+    app.router.lifespan_context = lifespan
 
     @app.middleware("http")
     async def csrf_guard(request: Request, call_next):
@@ -165,10 +215,50 @@ def create_app(
     def view(a: Audit) -> dict:
         return audit_view(a, settings, registry_for(a))
 
+    def enricher_for(a: Audit):
+        return demo_enr if a.mode == "demo" else real_enricher
+
+    def has_verified(a: Audit) -> bool:
+        return any(a.is_verified(i, settings.verify_ttl_days) for i in a.identities)
+
+    def start_run(a: Audit, module: Optional[str] = None, scheduled: bool = False) -> None:
+        a.running = True
+
+        async def job():
+            try:
+                await run_audit(a, registry_for(a), settings, only_module=module, on_progress=store.persist,
+                                enricher=enricher_for(a), scheduled=scheduled)
+            except asyncio.CancelledError:
+                a.running = False
+                raise
+            except Exception as e:  # noqa: BLE001
+                a.running = False
+                a.add_log("ERROR", f"AUDIT CRASHED — {e}")
+            finally:
+                tasks.pop(a.id, None)
+
+        tasks[a.id] = asyncio.create_task(job())
+
+    def due(a: Audit) -> bool:
+        if not a.schedule_hours or a.running or a.mode != "real" or not has_verified(a):
+            return False
+        last = next((r.finished_at for r in reversed(a.runs) if r.finished_at), None) or a.created_at
+        return utcnow() - last >= timedelta(hours=a.schedule_hours)
+
+    async def scheduler_loop() -> None:
+        """Периодический повторный аудит: новые находки появятся в разделе изменений."""
+        while True:
+            await asyncio.sleep(settings.scheduler_interval)
+            for a in store.all():
+                if due(a):
+                    start_run(a, scheduled=True)
+
+    app.state.scheduler_tick = lambda: [start_run(a, scheduled=True) for a in store.all() if due(a)]
+
     # ---------- config / meta ----------
     @app.get("/api/config")
     def config():
-        return config_view(settings)
+        return config_view(settings, store)
 
     @app.post("/api/normalize")
     def normalize(body: NormalizeIn):
@@ -224,6 +314,12 @@ def create_app(
         a.add_log("INFO", "STORAGE ....... " + ("аудит сохраняется на диск" if body.save else "только в памяти, файл удалён"))
         store.persist(a)
         return view(a)
+
+    @app.get("/api/audits/{audit_id}/export.html")
+    def export_html(audit_id: str):
+        a = get_audit(audit_id)
+        page = html_report.render(a, report_mod.build(a, settings), settings.verify_ttl_days)
+        return HTMLResponse(page, headers={"Content-Disposition": f'attachment; filename="hidenseek_{a.id}.html"'})
 
     @app.get("/api/audits/{audit_id}/export")
     def export(audit_id: str):
@@ -365,27 +461,13 @@ def create_app(
         reg = registry_for(a)
         if body.module and body.module not in reg:
             raise HTTPException(400, "Нет такого модуля")
-        if not any(a.is_verified(i, settings.verify_ttl_days) for i in a.identities):
+        if not has_verified(a):
             raise HTTPException(400, "Нет подтверждённых идентификаторов — поиск не запускается")
-        a.running = True
-
-        async def job():
-            try:
-                await run_audit(a, reg, settings, only_module=body.module, on_progress=store.persist)
-            except asyncio.CancelledError:
-                a.running = False
-                raise
-            except Exception as e:  # noqa: BLE001
-                a.running = False
-                a.add_log("ERROR", f"AUDIT CRASHED — {e}")
-            finally:
-                tasks.pop(a.id, None)
-
-        tasks[a.id] = asyncio.create_task(job())
+        start_run(a, body.module)
         return view(a)
 
     @app.post("/api/audits/{audit_id}/findings/{finding_id}/review")
-    def review(audit_id: str, finding_id: str, body: ReviewIn):
+    async def review(audit_id: str, finding_id: str, body: ReviewIn):
         a = get_audit(audit_id)
         f = a.finding(finding_id)
         if not f:
@@ -397,8 +479,71 @@ def create_app(
         else:
             f.status = body.verdict
         a.add_log("OK" if f.status == "mine" else "INFO", f"MANUAL REVIEW ....... {f.value} → {f.status.upper()}")
+        if eligible(f):
+            await read_own_page(a, f)
         touch(a)
         return view(a)
+
+    async def read_own_page(a: Audit, f) -> None:
+        """Аккаунт подтверждён как ваш → читаем только эту страницу и сверяем поля с профилем «это я»."""
+        enr = enricher_for(a)
+        if a.mode == "demo":
+            await enrich_own_profiles(a, enr, None, only=f)
+            return
+
+        async def bg():
+            await enrich_own_profiles(a, enr, None, only=f)
+            touch(a)
+
+        if enr.available()[0]:
+            asyncio.create_task(bg())
+        else:
+            a.add_log("INFO", f"OWN PROFILE ....... {enr.available()[1]}")
+
+    @app.post("/api/audits/{audit_id}/findings/{finding_id}/resolve")
+    def resolve(audit_id: str, finding_id: str, body: ResolveIn):
+        a = get_audit(audit_id)
+        f = a.finding(finding_id)
+        if not f:
+            raise HTTPException(404, "Нет такой находки")
+        f.resolved_at = utcnow() if body.done else None
+        a.add_log("OK" if body.done else "INFO", f"CHECKLIST ....... {f.value} → {'ЗАКРЫТО' if body.done else 'ОТКРЫТО'}")
+        touch(a)
+        return view(a)
+
+    @app.put("/api/audits/{audit_id}/schedule")
+    def schedule(audit_id: str, body: ScheduleIn):
+        a = get_audit(audit_id)
+        if a.mode == "demo":
+            raise HTTPException(400, "Расписание — только для аудита своего следа")
+        if body.hours is not None and body.hours not in SCHEDULE_CHOICES:
+            raise HTTPException(400, f"Период: {', '.join(map(str, SCHEDULE_CHOICES))} ч")
+        a.schedule_hours = body.hours
+        a.add_log("INFO", "SCHEDULE ....... " + (f"повторный аудит каждые {body.hours} ч" if body.hours else "выключен"))
+        store.persist(a)
+        return view(a)
+
+    @app.put("/api/audits/{audit_id}/assistant-consent")
+    def assistant_consent(audit_id: str, body: ConsentIn):
+        a = get_audit(audit_id)
+        a.assistant_consent = body.consent
+        a.add_log("INFO", "ASSISTANT ....... " + ("сводку можно отправлять в Anthropic API" if body.consent else "согласие отозвано"))
+        store.persist(a)
+        return view(a)
+
+    @app.post("/api/audits/{audit_id}/assistant")
+    async def ask_assistant(audit_id: str, body: AssistantIn):
+        a = get_audit(audit_id)
+        if not assistant_mod.configured(settings):
+            raise HTTPException(400, "Ассистент не настроен: добавьте ANTHROPIC_API_KEY в .env")
+        if a.mode != "demo" and not a.assistant_consent:
+            raise HTTPException(403, "Нужно согласие: вопрос и сводка отчёта будут отправлены в Anthropic API")
+        try:
+            answer = await assistant_mod.ask(settings, report_mod.build(a, settings), body.message,
+                                             [t.model_dump() for t in body.history])
+        except assistant_mod.AssistantError as e:
+            raise HTTPException(502, str(e))
+        return {"answer": answer}
 
     @app.put("/api/audits/{audit_id}/modules/{module}")
     def toggle_module(audit_id: str, module: str, body: ToggleIn):

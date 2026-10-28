@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HidenSeek — мой цифровой след</title>
+<link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/static/img/apple-touch-icon.png">
+<link rel="stylesheet" href="/static/css/ghost.css">
+<link rel="stylesheet" href="/static/css/hidenseek.css">
+</head>
+<body>
+<div class="app">
+<header class="topbar">
+  <button class="menu-btn" id="menuBtn" aria-label="Открыть навигацию" aria-expanded="false">☰ MENU</button>
+  <div class="brand"><img class="brand-mark" src="/static/img/brand-mark.png" width="28" height="28" alt="" aria-hidden="true"><div>GHOST TERMINAL<small>HIDENSEEK / SELF-AUDIT</small></div></div>
+  <div class="case-pill"><span class="live-dot"></span> <span id="pillAudit">НЕТ АУДИТА</span> <span style="color:#3b5141">—</span> МОЙ СЛЕД</div>
+  <div class="top-spacer"></div>
+  <div class="top-status"><b>● LOCAL</b> &nbsp; <span id="topStatus">DB: MEMORY</span></div>
+  <button class="lang" id="langBtn">RU / EN</button>
+  <button class="theme-btn" id="themeBtn" title="Visual Mode">VISUAL</button>
+</header>
+<div class="theme-panel" id="themePanel">
+  <div class="label">VISUAL MODE</div>
+  <button class="theme-opt active" data-theme="wired">WIRED — dark green</button>
+  <button class="theme-opt" data-theme="mono">MONOCHROME</button>
+  <button class="theme-opt" data-theme="crt">CRT — scanlines</button>
+  <button class="theme-opt" data-theme="clean">CLEAN — soft green</button>
+</div>
+<div class="backdrop" id="backdrop"></div>
+<div class="shell" id="shell">
+<aside class="sidebar" id="sidebar" aria-label="Основная навигация">
+  <div>
+    <div class="nav-label">МОЙ СЛЕД</div>
+    <nav class="nav-list">
+      <button class="nav-item" data-view="case"><span class="ico">⌂</span>Мой след</button>
+      <button class="nav-item" data-view="identities"><span class="ico">✓</span>Идентификаторы<span class="nav-count" id="navIdent">—</span></button>
+      <button class="nav-item" data-view="graph"><span class="ico">⌘</span>Граф<span class="nav-count" id="navGraph">—</span></button>
+      <button class="nav-item" data-view="evidence"><span class="ico">▤</span>Находки<span class="nav-count" id="navFind">—</span></button>
+      <button class="nav-item" data-view="report"><span class="ico">!</span>Рекомендации<span class="nav-count" id="navRep">—</span></button>
+      <button class="nav-item" data-view="sources"><span class="ico">⌁</span>Источники<span class="nav-count" id="navSrc">—</span></button>
+    </nav>
+  </div>
+  <div>
+    <div class="nav-label">ИНСТРУМЕНТЫ</div>
+    <nav class="nav-list">
+      <button class="nav-item" data-view="timeline"><span class="ico">≋</span>Хронология</button>
+      <button class="nav-item" data-view="normalize"><span class="ico">⇄</span>Нормализация</button>
+      <button class="nav-item" data-view="assistant"><span class="ico">◈</span>Ассистент</button>
+      <button class="nav-item" data-view="terminal"><span class="ico">›_</span>Журнал</button>
+    </nav>
+  </div>
+  <div>
+    <div class="nav-label">СЕАНС</div>
+    <nav class="nav-list">
+      <button class="nav-item" data-view="start"><span class="ico">＋</span>Аудиты</button>
+      <button class="nav-item" data-view="settings"><span class="ico">⚙</span>Настройки и данные</button>
+      <button class="nav-item" data-view="about"><span class="ico">?</span>О проекте</button>
+    </nav>
+  </div>
+  <div class="sidebar-bottom">ENVIRONMENT <span class="ok">● LOCAL</span><br>DATA / NEVER LEAVES MACHINE<br>BUILD: <span id="buildVer">0.1.0</span></div>
+</aside>
+<main class="main">
+  <div class="breadcrumb"><span>HIDENSEEK</span> / <span>SELF-AUDIT</span> / <b style="color:#b5c7b8;font-weight:400" id="crumbId">—</b></div>
+  <section class="pagehead">
+    <div><div class="eyebrow" id="eyebrow">PERSONAL FOOTPRINT</div><h1 id="pageTitle">Мой цифровой след</h1><div class="subtitle" id="pageSub">Что обо мне видно снаружи и что стоит закрыть. Поиск запускают только подтверждённые идентификаторы.</div></div>
+    <div class="head-actions"><button class="btn" id="exportBtn" disabled>↧ ЭКСПОРТ JSON</button><button class="btn primary" id="runBtn" disabled>▶ ЗАПУСТИТЬ АУДИТ</button></div>
+  </section>
+
+  <!-- START -->
+  <section class="view" id="view-start">
+    <div class="start-grid">
+      <div class="panel">
+        <div class="panel-head"><div class="left"><span class="sigil">⌂</span> НОВЫЙ АУДИТ СВОЕГО СЛЕДА</div><span class="dim">REAL</span></div>
+        <div class="panel-body">
+<pre class="start-ascii">  ┌───────────────────────────────┐
+  │  ЧТО ОБО МНЕ ВИДНО СНАРУЖИ?   │
+  └───────────────────────────────┘</pre>
+          <ol class="steps">
+            <li>Добавьте свои email, домен, ник — или войдите через GitHub.</li>
+            <li>Подтвердите владение: код из письма, TXT-запись, OAuth.</li>
+            <li>Запустите аудит — модули работают только от подтверждённого.</li>
+            <li>Отметьте «мой / не мой» и закройте то, что не должно быть видно.</li>
+          </ol>
+          <button class="btn primary" id="newRealBtn">＋ НАЧАТЬ АУДИТ</button>
+        </div>
+        <div class="panel-foot"><span>ОБЪЕКТ АУДИТА — ТОЛЬКО ВЫ</span><span>ДАННЫЕ ЛОКАЛЬНО</span></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div class="left"><span class="sigil">◈</span> УЧЕБНЫЙ РЕЖИМ</div><span class="dim">SYNTHETIC / NO NETWORK</span></div>
+        <div class="panel-body" id="personaList"></div>
+        <div class="panel-foot"><span>СИНТЕТИЧЕСКИЕ ПЕРСОНАЖИ + МОК-ИСТОЧНИКИ</span><span>ДЛЯ ДЕМО И ПОРТФОЛИО</span></div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <div class="panel-head"><div class="left"><span class="sigil">▤</span> АУДИТЫ В ЭТОМ СЕАНСЕ</div><span class="dim" id="auditCount">0</span></div>
+      <div class="panel-body" id="auditList"></div>
+    </div>
+  </section>
+
+  <div class="content-case" id="contentCase">
+  <section class="case-strip" id="caseStrip">
+    <div class="case-intro"><div class="case-label">ТЕКУЩИЙ АУДИТ / ЛОКАЛЬНЫЙ ПРОФИЛЬ</div><div class="case-name" id="caseName">—</div><div class="case-meta" id="caseMeta"></div></div>
+    <div class="case-stat"><strong class="green" id="statFind">0</strong><span>НАХОДОК</span></div>
+    <div class="case-stat"><strong id="statExp">0</strong><span>РАСКРЫТИЙ</span></div>
+    <div class="case-stat"><strong style="color:var(--amber)" id="statReview">0</strong><span>НА ПРОВЕРКЕ</span></div>
+  </section>
+
+  <div class="worktabs" role="tablist">
+    <button class="worktab" data-view="case">01 / ОБЗОР</button>
+    <button class="worktab" data-view="identities">02 / ИДЕНТИФИКАТОРЫ</button>
+    <button class="worktab" data-view="graph">03 / ГРАФ</button>
+    <button class="worktab" data-view="evidence">04 / НАХОДКИ <span class="tab-count" id="tabFind">0</span></button>
+    <button class="worktab" data-view="report">05 / РЕКОМЕНДАЦИИ</button>
+  </div>
+
+  <!-- OVERVIEW -->
+  <section class="view" id="view-case">
+    <div class="panel summary-panel">
+      <div class="panel-head"><div class="left"><span class="sigil">!</span> СВОДКА</div><span class="dim" id="sevLabel">—</span></div>
+      <div class="panel-body"><div id="summaryText" class="summary-text">—</div><div id="summaryChips" class="candidate-tags"></div><div id="conflictBox"></div></div>
+    </div>
+    <div class="workspace-grid" style="margin-top:16px">
+      <div class="panel">
+        <div class="panel-head"><div class="left"><span class="sigil">▣</span> МОИ ЛИ ЭТО АККАУНТЫ?</div><span class="dim" id="reviewCount">0</span></div>
+        <div class="panel-body" id="reviewList"></div>
+        <div class="panel-foot"><span>CONFIDENCE — ВЕРОЯТНОСТЬ, ЧТО АККАУНТ ВАШ</span><button class="btn small" data-view="evidence">ВСЕ НАХОДКИ →</button></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div class="left"><span class="sigil">⌁</span> САМОЕ ВАЖНОЕ</div><span class="dim">BY SEVERITY</span></div>
+        <div class="panel-body evidence-list" id="topList"></div>
+        <div class="panel-foot"><span>ЧТО РАСКРЫТО И ЧТО СДЕЛАТЬ</span><button class="btn small" data-view="report">РЕКОМЕНДАЦИИ →</button></div>
+      </div>
+    </div>
+    <div class="lower-grid">
+      <div class="panel">
+        <div class="panel-head"><div class="left"><span class="sigil">▦</span> ОЧЕРЕДЬ / ИСТОЧНИКИ</div><span class="dim" id="queueState">IDLE</span></div>
+        <div class="panel-body" id="queueList"></div>
+        <div class="panel-foot"><span>RATE-LIMIT · RETRY · СБОЙ МОДУЛЯ НЕ РОНЯЕТ АУДИТ</span><button class="btn small" data-view="sources">ИСТОЧНИКИ ↗</button></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div class="left"><span class="sigil">›_</span> ЖУРНАЛ СЕАНСА</div><span class="dim" id="logCount">0</span></div>
+        <div class="log-filters" data-log="mini">
+          <button class="log-filter active" data-type="ALL">ALL</button><button class="log-filter" data-type="OK">OK</button><button class="log-filter" data-type="INFO">INFO</button><button class="log-filter" data-type="WARN">WARN</button><button class="log-filter" data-type="ERROR">ERROR</button>
+        </div>
+        <div class="terminal" id="terminalLog"></div>
+        <div class="panel-foot"><span>LOCAL ONLY</span><span style="color:var(--green)">● LOGGING</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- IDENTITIES -->
+  <section class="view" id="view-identities">
+    <div class="workspace-grid">
+      <div class="panel">
+        <div class="panel-head"><div class="left"><span class="sigil">✓</span> МОИ ИДЕНТИФИКАТОРЫ</div><span class="dim" id="identCount">0</span></div>
+        <div class="panel-body">
+          <form id="identForm" class="inline-form">
+            <select id="identType" aria-label="Тип идентификатора">
+              <option value="email">Email</option>
+              <option value="domain">Домен</option>
+              <option value="username">Ник</option>
+            </select>
+            <input id="identValue" placeholder="you@example.com" autocomplete="off" aria-label="Значение">
+            <button class="btn primary">＋ ДОБАВИТЬ</button>
+          </form>
+          <div class="gh-row"><button class="btn" id="ghLoginBtn">⎇ ВОЙТИ ЧЕРЕЗ GITHUB</button><span class="hint" id="ghHint"></span></div>
+          <div id="identList"></div>
+        </div>
+        <div class="panel-foot"><span>НЕПОДТВЕРЖДЁННЫЙ ИДЕНТИФИКАТОР МОДУЛИ НЕ ЗАПУСКАЕТ</span><span id="ttlHint"></span></div>
+      </div>
+      <div>
+        <div class="panel">
+          <div class="panel-head"><div class="left"><span class="sigil">◎</span> ПРОФИЛЬ «ЭТО Я»</div><span class="dim">ТОЛЬКО ДЛЯ СВЕРКИ</span></div>
+          <div class="panel-body">
+            <form id="profileForm" class="stack-form">
+              <label>ФИО<input id="pfName" autocomplete="off" placeholder="Иван Петров"></label>
+              <label>Город<input id="pfCity" autocomplete="off" placeholder="Новосибирск"></label>
+              <label>Телефоны (через запятую)<input id="pfPhones" autocomplete="off" placeholder="+7 900 000-00-00"></label>
+              <button class="btn primary">СОХРАНИТЬ ЭТАЛОН</button>
+            </form>
+            <p class="ascii-note">ФИО, город и телефон не уникальны и не подтверждаются — поиск по ним не запускается. Они нужны, чтобы понять: «в найденном профиле видно моё настоящее имя / город».</p>
+          </div>
+        </div>
+        <div class="panel" style="margin-top:16px">
+          <div class="panel-head"><div class="left"><span class="sigil">?</span> КАК ПОДТВЕРЖДАЕТСЯ</div></div>
+          <div class="panel-body">
+            <div class="source-table-wrap"><table class="source-table compact"><thead><tr><th>ТИП</th><th>СПОСОБ</th><th>ПОИСК</th></tr></thead><tbody>
+              <tr><td>Email</td><td>6-значный код на почту</td><td><span class="tag good">ДА</span></td></tr>
+              <tr><td>GitHub</td><td>вход через OAuth</td><td><span class="tag good">ДА</span></td></tr>
+              <tr><td>Домен</td><td>TXT hidenseek-verify=…</td><td><span class="tag good">ДА</span></td></tr>
+              <tr><td>Ник</td><td>от GitHub или ссылкой с домена</td><td><span class="tag good">ДА</span></td></tr>
+              <tr><td>Телефон</td><td>без SMS-шлюза нельзя</td><td><span class="tag">СВЕРКА</span></td></tr>
+              <tr><td>ФИО, город</td><td>не уникальны</td><td><span class="tag">СВЕРКА</span></td></tr>
+            </tbody></table></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- GRAPH -->
+  <section class="view" id="view-graph">
+    <div class="panel">
+      <div class="panel-head"><div class="left"><span class="sigil">⌘</span> Я → ИДЕНТИФИКАТОРЫ → ГДЕ ВИДНЫ</div><div style="display:flex;align-items:center;gap:8px"><button class="btn small" id="toggleFullscreen">⛶ НА ВЕСЬ ЭКРАН</button><span class="dim" id="graphCount">0 NODES</span></div></div>
+      <div class="panel-body graph-wrap" id="graphPanelBody">
+        <button id="fsExitBtn" class="btn" style="display:none;position:fixed;top:10px;right:10px;z-index:600;padding:9px 14px;font-size:11px">✕ ВЫЙТИ</button>
+        <div class="graph-stage" id="graphStage2d" style="position:relative;overflow:hidden;touch-action:none">
+          <div id="graphViewport" class="graph-viewport">
+            <div id="graphWorld" style="position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform">
+              <svg id="graphCardsSvg" width="2400" height="2400" style="position:absolute;left:0;top:0;overflow:visible;pointer-events:none"></svg>
+            </div>
+          </div>
+          <div class="graph-empty" id="graphEmpty">Граф появится после первого аудита</div>
+          <div style="position:absolute;bottom:8px;right:8px;display:flex;gap:6px;z-index:20">
+            <button id="zoomOut" class="btn" style="padding:7px 12px;font-size:13px;min-width:38px">−</button>
+            <button id="zoomReset" class="btn" style="padding:7px 10px;font-size:9px">ЦЕНТР</button>
+            <button id="zoomIn" class="btn" style="padding:7px 12px;font-size:13px;min-width:38px">+</button>
+          </div>
+        </div>
+        <div class="graph-legend">
+          <div class="section-title">ФИЛЬТР СВЯЗЕЙ</div>
+          <div class="graph-filters">
+            <label><input type="checkbox" data-filter="confirmed" checked> Подтверждённые</label>
+            <label><input type="checkbox" data-filter="hypo" checked> На проверке</label>
+            <label><input type="checkbox" data-filter="conflict" checked> «Не мой»</label>
+          </div>
+          <hr class="sep">
+          <div class="section-title">ВЫБРАННЫЙ УЗЕЛ</div>
+          <div id="nodeInfo" class="node-info">Нажмите на карточку</div>
+          <hr class="sep">
+          <div class="legend-row"><span class="legend-shape person"></span> Я</div>
+          <div class="legend-row"><span class="legend-shape id"></span> Мой идентификатор</div>
+          <div class="legend-row"><span class="legend-shape profile"></span> Где виден</div>
+          <hr class="sep">
+          <div class="legend-row"><span class="legend-dot"></span> Подтверждено / мой</div>
+          <div class="legend-row"><span class="legend-dot muted"></span> На проверке (пунктир)</div>
+          <div class="legend-row"><span class="legend-dot warn"></span> Отмечено «не мой»</div>
+          <div class="ascii-note">Только ваши идентификаторы и места, где они видны. Связей с другими людьми граф не строит.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- EVIDENCE -->
+  <section class="view" id="view-evidence">
+    <div class="panel">
+      <div class="panel-head"><div class="left"><span class="sigil">▤</span> РЕЕСТР НАХОДОК</div><span class="dim" id="findCount">0</span></div>
+      <div class="log-filters" id="findFilters">
+        <button class="log-filter active" data-f="all">ВСЕ</button><button class="log-filter" data-f="review">НА ПРОВЕРКЕ</button><button class="log-filter" data-f="mine">МОИ</button><button class="log-filter" data-f="not_mine">НЕ МОИ</button><button class="log-filter" data-f="exposed">С РАСКРЫТИЯМИ</button>
+      </div>
+      <div class="source-table-wrap"><table class="source-table"><thead><tr><th>НАХОДКА</th><th>ТИП</th><th>ИСТОЧНИК</th><th>РАСКРЫВАЕТ</th><th>CONF.</th><th>СТАТУС</th><th>ДАТА</th></tr></thead><tbody id="findTable"></tbody></table></div>
+      <div class="panel-foot"><span>ФАКТ = ИСТОЧНИК + ДАТА + CONFIDENCE</span><span>КЛИК — ДЕТАЛИ И РЕКОМЕНДАЦИИ</span></div>
+    </div>
+  </section>
+
+  <!-- REPORT -->
+  <section class="view" id="view-report">
+    <div class="panel">
+      <div class="panel-head"><div class="left"><span class="sigil">!</span> ОТЧЁТ И РЕКОМЕНДАЦИИ</div><button class="btn small" id="exportBtn2">↧ ЭКСПОРТ JSON</button></div>
+      <div class="panel-body"><div class="summary-text" id="reportSummary"></div><div id="reportItems"></div></div>
+      <div class="panel-foot"><span>SEVERITY: ПАРОЛЬ В УТЕЧКЕ &gt; ИМЯ + ГОРОД &gt; ЗАНЯТЫЙ НИК</span><span>DIFF МЕЖДУ АУДИТАМИ — СЛЕДУЮЩИЙ ЭТАП</span></div>
+    </div>
+  </section>
+
+  <!-- SOURCES -->
+  <section class="view" id="view-sources">
+    <div class="panel"><div class="panel-head"><div class="left"><span class="sigil">⌁</span> ИСТОЧНИКИ И ИХ СТАТУС</div><span class="dim" id="srcCount">0</span></div>
+      <div class="source-table-wrap"><table class="source-table"><thead><tr><th>ВКЛ</th><th>ИСТОЧНИК</th><th>ПРИНИМАЕТ → ОТДАЁТ</th><th>СТАТУС</th><th>ДЕЙСТВИЕ</th></tr></thead><tbody id="srcTable"></tbody></table></div>
+      <div class="panel-foot"><span>МОДУЛЬ ПРИНИМАЕТ ТОЛЬКО ПОДТВЕРЖДЁННЫЕ ТИПЫ</span><span>«ЧТО ВИДНО ОБО МНЕ»</span></div>
+    </div>
+  </section>
+
+  <!-- TIMELINE -->
+  <section class="view" id="view-timeline">
+    <div class="panel">
+      <div class="panel-head"><div class="left"><span class="sigil">≋</span> ХРОНОЛОГИЯ АУДИТА</div><span class="dim">NEWEST FIRST</span></div>
+      <div class="panel-body"><div class="timeline" id="timeline"></div></div>
+    </div>
+  </section>
+
+  <!-- NORMALIZE -->
+  <section class="view" id="view-normalize">
+    <div class="panel"><div class="panel-head"><div class="left"><span class="sigil">⇄</span> НОРМАЛИЗАЦИЯ</div><span class="dim">LOCAL TRANSFORM</span></div><div class="panel-body">
+      <p class="subtitle" style="margin:0 0 14px">Транслит, единый формат телефона, варианты ника — то, что использует сверка с профилем «это я». Это техника сравнения, а не доказательство совпадения.</p>
+      <label class="section-title" for="normInput">ИСХОДНОЕ ЗНАЧЕНИЕ</label><input id="normInput" class="term-input" value="Серёжа_Petrov 8 (900) 000-00-00">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0"><button class="btn primary" id="normalizeBtn">НОРМАЛИЗОВАТЬ</button><button class="btn" id="clearNorm">ОЧИСТИТЬ</button></div>
+      <div id="normResults" class="empty-ascii"><pre>┌─────────────────────┐
+│     [  EMPTY  ]     │
+└─────────────────────┘</pre>Введите значение и запустите нормализацию.</div>
+    </div></div>
+  </section>
+
+  <!-- ASSISTANT -->
+  <section class="view" id="view-assistant">
+    <div class="panel">
+      <div class="panel-head"><div class="left"><span class="sigil">◈</span> АССИСТЕНТ</div><span class="dim">ЗАГОТОВКА · ПО КЛЮЧЕВЫМ СЛОВАМ</span></div>
+      <div class="panel-body" style="padding:0">
+        <div class="assistant-note">Объясняет находки и подсказывает, как закрыть утечку. Сейчас — заготовки по ключевым словам; позже — Anthropic API на бэкенде (раздел 9.1).</div>
+        <div id="assistantLog" class="assistant-log"></div>
+        <form id="assistantForm" class="assistant-form"><input id="assistantInput" placeholder="Спроси про утечку, коммиты, ник, confidence…" autocomplete="off"><button class="btn primary">→</button></form>
+      </div>
+    </div>
+  </section>
+
+  <!-- TERMINAL -->
+  <section class="view" id="view-terminal"><div class="panel"><div class="panel-head"><div class="left"><span class="sigil">›_</span> ЖУРНАЛ СОБЫТИЙ</div><span class="dim">READ-ONLY</span></div>
+    <div class="log-filters" data-log="full">
+      <button class="log-filter active" data-type="ALL">ALL</button><button class="log-filter" data-type="OK">OK</button><button class="log-filter" data-type="INFO">INFO</button><button class="log-filter" data-type="WARN">WARN</button><button class="log-filter" data-type="ERROR">ERROR</button>
+    </div>
+    <div class="terminal tall" id="fullTerminal"></div></div></section>
+
+  <!-- SETTINGS -->
+  <section class="view" id="view-settings"><div class="panel"><div class="panel-head"><div class="left"><span class="sigil">⚙</span> НАСТРОЙКИ И ДАННЫЕ</div></div><div class="panel-body">
+    <div class="queue-row"><span class="queue-icon">●</span><div><label class="check"><input type="checkbox" id="saveToggle"> Сохранить аудит на диск</label><small>без отметки ничего не пишется на диск; файлы — в data/audits/</small></div><span class="queue-state" id="saveState">MEMORY</span></div>
+    <div class="queue-row"><span class="queue-icon">●</span><div>SMTP для кода на почту<small>SMTP_* в .env</small></div><span class="queue-state" id="cfgSmtp">—</span></div>
+    <div class="queue-row"><span class="queue-icon">●</span><div>GitHub OAuth<small>GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET; callback: <span class="mono" id="cbUrl"></span></small></div><span class="queue-state" id="cfgGh">—</span></div>
+    <div class="queue-row"><span class="queue-icon">●</span><div>HaveIBeenPwned<small>HIBP_API_KEY (ключ платный)</small></div><span class="queue-state" id="cfgHibp">—</span></div>
+    <div class="queue-row"><span class="queue-icon">●</span><div>Повторное подтверждение<small>после этого срока идентификатор снова нужно подтвердить</small></div><span class="queue-state" id="cfgTtl">—</span></div>
+    <div class="queue-row"><span class="queue-icon">●</span><div>Visual Mode<small>WIRED / MONOCHROME / CRT / CLEAN</small></div><span class="queue-state" id="settingsTheme">WIRED</span></div>
+    <div class="danger-zone">
+      <button class="btn" id="exportBtn3">↧ ПОЛНАЯ ВЫГРУЗКА (JSON)</button>
+      <button class="btn danger" id="deleteAuditBtn">✕ УДАЛИТЬ ЭТОТ АУДИТ</button>
+      <button class="btn danger" id="wipeBtn">✕ УДАЛИТЬ ВСЕ ДАННЫЕ</button>
+    </div>
+  </div></div></section>
+
+  <!-- ABOUT -->
+  <section class="view" id="view-about"><div class="panel"><div class="panel-head"><div class="left"><span class="sigil">?</span> HIDENSEEK / О ПРОЕКТЕ</div></div><div class="panel-body"><pre class="ascii-panel" style="min-height:0">   ▄████  ▒█████   ██████ ▄▄▄█████▓
+  ██▒ ▀█▒▒██▒  ██▒▒██    ▒ ▓  ██▒ ▓▒
+ ▒██░▄▄▄░▒██░  ██▒░ ▓██▄   ▒ ▓██░ ▒░
+ ░▓█  ██▓▒██   ██░  ▒   ██▒░ ▓██▓ ░
+ ░▒▓███▀▒░ ████▓▒░▒██████▒▒  ▒██▒ ░
+  ░▒   ▒ ░ ▒░▒░▒░ ▒ ▒▓▒ ▒ ░  ▒ ░░
+       ░     ░ ░        ░</pre>
+    <p class="about-text">HidenSeek — локальный аудит <b>собственного</b> цифрового следа: «что обо мне видно снаружи и что стоит закрыть?». Поиск стартует только от идентификаторов, принадлежность которых вы подтвердили; ФИО, город и телефон служат эталоном для сверки и сами ничего не ищут.</p>
+    <p class="about-text">Не входит в проект: модули, раскрывающие круг общения, местоположение или активность человека, и аудит другого человека без его собственного подтверждения на своей машине.</p>
+    <div class="candidate-tags"><span class="tag">RU-FIRST</span><span class="tag">LOCAL-FIRST</span><span class="tag">VERIFIED SEEDS ONLY</span><span class="tag">PROVENANCE</span></div></div></div></section>
+
+  <div class="ticker"><div class="ticker-label">SYSTEM FEED</div><div class="ticker-track" id="ticker"></div></div>
+  </div><!-- content-case -->
+</main>
+<div class="ctx-backdrop" id="ctxBackdrop"></div>
+<aside class="ctx-panel" id="ctxPanel" aria-label="Контекст">
+  <div class="ctx-head"><div class="left"><span class="sigil">◈</span> CONTEXT</div><button class="ctx-close" id="ctxClose">✕</button></div>
+  <div class="ctx-body" id="ctxBody"><div class="ctx-empty">Выберите находку<br>или узел графа</div></div>
+</aside>
+</div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<script src="/static/js/app.js"></script>
+</body>
+</html>
